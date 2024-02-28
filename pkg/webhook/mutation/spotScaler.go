@@ -14,7 +14,7 @@ func SpotScalerMutateWebhook(logger kwhlog.Logger) (kwhwebhook.Webhook, error) {
 
 	return kwhmutating.NewWebhook(kwhmutating.WebhookConfig{
 		ID:      "multiwebhook-spotScalerutator",
-		Obj:     &corev1.Binding{},
+		Obj:     &corev1.Pod{},
 		Mutator: kwhmutating.NewChain(logger, mutators...),
 		Logger:  logger,
 	})

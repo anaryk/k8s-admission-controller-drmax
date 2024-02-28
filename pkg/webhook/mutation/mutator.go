@@ -42,7 +42,7 @@ type SpotScalerMutator struct {
 }
 
 func (m *SpotScalerMutator) Mutate(_ context.Context, _ *kwhmodel.AdmissionReview, obj metav1.Object) (*kwhmutating.MutatorResult, error) {
-	binding, okPod := obj.(*corev1.Binding)
+	pod, okPod := obj.(*corev1.Pod)
 	if !okPod {
 		return &kwhmutating.MutatorResult{}, nil
 	}
@@ -50,7 +50,7 @@ func (m *SpotScalerMutator) Mutate(_ context.Context, _ *kwhmodel.AdmissionRevie
 	// var numberOfbesteffordAnnotation string = "spot-scaler.drmax.global/bestefford"
 	// var enabledAnnotation string = "spot-scaler.drmax.global/enabled"
 
-	podAnnotations := binding.GetAnnotations()
+	podAnnotations := pod.GetAnnotations()
 
 	for k, v := range podAnnotations {
 		m.logger.Debugf("Annotation: %s, Value: %s", k, v)
