@@ -55,7 +55,9 @@ func (m *SpotScalerMutator) Mutate(_ context.Context, _ *kwhmodel.AdmissionRevie
 
 	depsAnnotations := deployment.GetAnnotations()
 
-	m.logger.Debugf("Debug info: number of guaranteed: %s, number of bestefford: %s", depsAnnotations[numberOfguaranteedAnnotation], depsAnnotations[numberOfbesteffordAnnotation])
+	for k, v := range depsAnnotations {
+		m.logger.Debugf("Annotation: %s, Value: %s", k, v)
+	}
 
 	//Validate deployment annotation and check if soutable fot mutation
 	if deployment.Annotations[enabledAnnotation] == "true" && deployment.Annotations[numberOfguaranteedAnnotation] != "" && deployment.Annotations[numberOfbesteffordAnnotation] != "" {
