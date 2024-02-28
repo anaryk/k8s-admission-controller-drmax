@@ -36,7 +36,11 @@ type Main struct {
 func (m *Main) Run() error {
 
 	logrusLogEntry := logrus.NewEntry(logrus.New())
-	logrusLogEntry.Logger.SetLevel(logrus.DebugLevel)
+	if m.flags.Debug {
+		logrusLogEntry.Logger.SetLevel(logrus.DebugLevel)
+	} else {
+		logrusLogEntry.Logger.SetLevel(logrus.InfoLevel)
+	}
 	m.logger = kwhlogrus.NewLogrus(logrusLogEntry)
 
 	// Create services.

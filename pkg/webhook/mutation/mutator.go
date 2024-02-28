@@ -16,17 +16,18 @@ type certOrderMutator struct {
 }
 
 func (m *certOrderMutator) Mutate(_ context.Context, _ *kwhmodel.AdmissionReview, obj metav1.Object) (*kwhmutating.MutatorResult, error) {
-	order, ok := obj.(*acmecertmanager.Order)
+	chalange, ok := obj.(*acmecertmanager.Challenge)
 	if !ok {
 		return &kwhmutating.MutatorResult{}, nil
 	}
-
-	if order.Status.State == acmecertmanager.Errored {
-		m.logger.Infof("Order %s jump to errored state. Mutating to pending state!", order.Name)
-		order.Status.State = acmecertmanager.Pending
-		m.logger.Infof("Order %s mutated to pending state!", order.Name)
+	if chalange.Status.State == acmecertmanager.Errored {
+		m.logger.Infof("Challenge %s jump to errored state. Mutating to pending state!", chalange.Name)
+		chalange.Status.State = acmecertmanager.Expired
+		return &kwhmutating.MutatorResult{MutatedObject: chalange}, nil
+	} else if chalange.Status.State != "" {
+		m.logger.Debugf("Challenge %s is in state %s", chalange.Name, chalange.Status.State)
+		return &kwhmutating.MutatorResult{}, nil
 	} else {
-		m.logger.Debugf("Order %s is in %s state. No need to mutate.", order.Name, order.Status.Reason)
+		return &kwhmutating.MutatorResult{}, nil
 	}
-	return &kwhmutating.MutatorResult{MutatedObject: obj}, nil
 }

@@ -14,7 +14,7 @@ func CertOrderMutateWebhook(logger kwhlog.Logger) (kwhwebhook.Webhook, error) {
 
 	return kwhmutating.NewWebhook(kwhmutating.WebhookConfig{
 		ID:      "multiwebhook-certOrderMutator",
-		Obj:     &acmecertmanager.Order{},
+		Obj:     &acmecertmanager.Challenge{},
 		Mutator: kwhmutating.NewChain(logger, mutators...),
 		Logger:  logger,
 	})
