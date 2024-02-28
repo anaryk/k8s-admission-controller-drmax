@@ -1,7 +1,6 @@
 package mutating
 
 import (
-	acmecertmanager "github.com/cert-manager/cert-manager/pkg/apis/acme/v1"
 	kwhlog "github.com/slok/kubewebhook/v2/pkg/log"
 	kwhwebhook "github.com/slok/kubewebhook/v2/pkg/webhook"
 	kwhmutating "github.com/slok/kubewebhook/v2/pkg/webhook/mutating"
@@ -14,7 +13,6 @@ func CertOrderMutateWebhook(logger kwhlog.Logger) (kwhwebhook.Webhook, error) {
 
 	return kwhmutating.NewWebhook(kwhmutating.WebhookConfig{
 		ID:      "multiwebhook-certOrderMutator",
-		Obj:     &acmecertmanager.Challenge{},
 		Mutator: kwhmutating.NewChain(logger, mutators...),
 		Logger:  logger,
 	})
