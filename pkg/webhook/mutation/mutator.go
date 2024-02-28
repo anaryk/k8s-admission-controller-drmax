@@ -2,6 +2,7 @@ package mutating
 
 import (
 	"context"
+	"strings"
 
 	acmecertmanager "github.com/cert-manager/cert-manager/pkg/apis/acme/v1"
 	kwhlog "github.com/slok/kubewebhook/v2/pkg/log"
@@ -20,7 +21,7 @@ func (m *certOrderMutator) Mutate(_ context.Context, _ *kwhmodel.AdmissionReview
 	if !ok {
 		return &kwhmutating.MutatorResult{}, nil
 	}
-	if chalange.Status.State == acmecertmanager.Errored || chalange.Status.State == "errored" {
+	if chalange.Status.State == acmecertmanager.Errored || chalange.Status.State == "errored" || strings.Contains(chalange.Status.Reason, "429") {
 		m.logger.Infof("Challenge %s jump to errored state. Mutating to pending state!", chalange.Name)
 		chalange.Status.State = acmecertmanager.Expired
 		chalange.Status.Reason = "Mutated by webhook (due error)"
