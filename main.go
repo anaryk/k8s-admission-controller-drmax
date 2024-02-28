@@ -52,7 +52,7 @@ func (m *Main) Run() error {
 
 	// Create webhooks
 
-	//New cert mutation webhook
+	//Cert order mutating webhook
 	certOrderMutator, err := mutating.CertOrderMutateWebhook(m.logger)
 	if err != nil {
 		return err
@@ -62,7 +62,16 @@ func (m *Main) Run() error {
 	if err != nil {
 		return err
 	}
-
+	//SpotScaler mutating webhook
+	SpotScalerMutator, err := mutating.SpotScalerMutateWebhook(m.logger)
+	if err != nil {
+		return err
+	}
+	SpotScalerMutator = kwhwebhook.NewMeasuredWebhook(metricsRec, SpotScalerMutator)
+	sswh, err := kwhhttp.HandlerFor(kwhhttp.HandlerConfig{Webhook: SpotScalerMutator, Logger: m.logger})
+	if err != nil {
+		return err
+	}
 	//Deployment validation webhook (not used)
 	vdw, err := validating.NewDeploymentWebhook(minReps, maxReps, m.logger)
 	if err != nil {
@@ -84,6 +93,7 @@ func (m *Main) Run() error {
 		m.logger.Infof("webhooks listening on %s...", m.flags.ListenAddress)
 		mux := http.NewServeMux()
 		mux.Handle("/webhooks/mutating/certorder", mpwh)
+		mux.Handle("/webhooks/mutating/spotscaler", sswh)
 		mux.Handle("/webhooks/validating/deployment", vdwh)
 		errC <- http.ListenAndServeTLS(
 			m.flags.ListenAddress,
