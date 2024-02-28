@@ -57,5 +57,5 @@ func (m *SpotScalerMutator) Mutate(_ context.Context, _ *kwhmodel.AdmissionRevie
 	for k, v := range podAnnotations {
 		m.logger.Debugf("Annotation: %s, Value: %s", k, v)
 	}
-	return &kwhmutating.MutatorResult{}, nil
+	return &kwhmutating.MutatorResult{MutatedObject: pod}, nil
 }
