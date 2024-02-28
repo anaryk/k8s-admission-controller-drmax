@@ -23,7 +23,7 @@ func (m *certOrderMutator) Mutate(_ context.Context, _ *kwhmodel.AdmissionReview
 	}
 	if chalange.Status.State == acmecertmanager.Errored || strings.Contains(chalange.Status.Reason, "429") {
 		m.logger.Infof("Challenge %s jump to errored state. Mutating to pending state!", chalange.Name)
-		chalange.Status.State = acmecertmanager.Expired
+		chalange.Status.State = acmecertmanager.Pending
 		chalange.Status.Reason = "Mutated by webhook (due error)"
 		if chalange.Annotations == nil {
 			chalange.Annotations = make(map[string]string)
