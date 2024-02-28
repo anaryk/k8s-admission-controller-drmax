@@ -28,6 +28,6 @@ webhooks:
       caBundle: CA_BUNDLE
     rules:
       - operations: ["*"]
-        apiGroups: ["apps"]
+        apiGroups: [""]
         apiVersions: ["v1"]
-        resources: ["deployments/scale"]
+        resources: ["pods/binding"]

@@ -2,15 +2,12 @@ package mutating
 
 import (
 	"context"
-	"strconv"
 	"strings"
 
-	"dev.azure.com/drmaxglobal/devops-team/_git/k8s-system-operator/pkg/utils"
 	acmecertmanager "github.com/cert-manager/cert-manager/pkg/apis/acme/v1"
 	kwhlog "github.com/slok/kubewebhook/v2/pkg/log"
 	kwhmodel "github.com/slok/kubewebhook/v2/pkg/model"
 	kwhmutating "github.com/slok/kubewebhook/v2/pkg/webhook/mutating"
-	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -45,42 +42,18 @@ type SpotScalerMutator struct {
 }
 
 func (m *SpotScalerMutator) Mutate(_ context.Context, _ *kwhmodel.AdmissionReview, obj metav1.Object) (*kwhmutating.MutatorResult, error) {
-	deployment, okDep := obj.(*apps.Deployment)
-	if !okDep {
+	pod, okPod := obj.(*corev1.Pod)
+	if !okPod {
 		return &kwhmutating.MutatorResult{}, nil
 	}
-	var numberOfguaranteedAnnotation string = "spot-scaler.drmax.global/guaranteed"
-	var numberOfbesteffordAnnotation string = "spot-scaler.drmax.global/bestefford"
-	var enabledAnnotation string = "spot-scaler.drmax.global/enabled"
+	// var numberOfguaranteedAnnotation string = "spot-scaler.drmax.global/guaranteed"
+	// var numberOfbesteffordAnnotation string = "spot-scaler.drmax.global/bestefford"
+	// var enabledAnnotation string = "spot-scaler.drmax.global/enabled"
 
-	depsAnnotations := deployment.GetAnnotations()
+	podAnnotations := pod.GetAnnotations()
 
-	for k, v := range depsAnnotations {
+	for k, v := range podAnnotations {
 		m.logger.Debugf("Annotation: %s, Value: %s", k, v)
-	}
-
-	//Validate deployment annotation and check if soutable fot mutation
-	if deployment.Annotations[enabledAnnotation] == "true" && deployment.Annotations[numberOfguaranteedAnnotation] != "" && deployment.Annotations[numberOfbesteffordAnnotation] != "" {
-		if utils.ValidateIntFiled(deployment.Annotations[numberOfguaranteedAnnotation]) && utils.ValidateIntFiled(deployment.Annotations[numberOfbesteffordAnnotation]) {
-			m.logger.Debugf("Deployment %s have all required annotation for correct work", deployment.Name)
-		} else {
-			m.logger.Debugf("Deployment %s have all required annotation for correct work", deployment.Name)
-			return &kwhmutating.MutatorResult{}, nil
-		}
-		numberOfguaranteed, _ := strconv.Atoi(deployment.Annotations[numberOfguaranteedAnnotation])
-		numberOfguaranteed32 := int32(numberOfguaranteed)
-		if *deployment.Spec.Replicas >= numberOfguaranteed32 {
-			deployment.Spec.Template.Spec.Tolerations = append(deployment.Spec.Template.Spec.Tolerations, corev1.Toleration{
-				Key:      "kubernetes.azure.com/scalesetpriority",
-				Value:    "spot",
-				Operator: corev1.TolerationOpEqual,
-				Effect:   corev1.TaintEffectNoSchedule,
-			})
-			return &kwhmutating.MutatorResult{MutatedObject: deployment}, nil
-		}
-	} else {
-		m.logger.Debugf("Deployment %s dont have all required annotation for correct work", deployment.Name)
-		return &kwhmutating.MutatorResult{}, nil
 	}
 	return &kwhmutating.MutatorResult{}, nil
 }
