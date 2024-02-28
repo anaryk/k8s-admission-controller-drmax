@@ -46,8 +46,7 @@ type SpotScalerMutator struct {
 
 func (m *SpotScalerMutator) Mutate(_ context.Context, _ *kwhmodel.AdmissionReview, obj metav1.Object) (*kwhmutating.MutatorResult, error) {
 	deployment, okDep := obj.(*apps.Deployment)
-	pod, okPod := obj.(*corev1.Pod)
-	if !okDep || !okPod {
+	if !okDep {
 		return &kwhmutating.MutatorResult{}, nil
 	}
 	var numberOfguaranteedAnnotation string = "spot-scaler.drmax.global/guaranteed"
@@ -65,13 +64,13 @@ func (m *SpotScalerMutator) Mutate(_ context.Context, _ *kwhmodel.AdmissionRevie
 		numberOfguaranteed, _ := strconv.Atoi(deployment.Annotations[numberOfguaranteedAnnotation])
 		numberOfguaranteed32 := int32(numberOfguaranteed)
 		if *deployment.Spec.Replicas >= numberOfguaranteed32 {
-			pod.Spec.Tolerations = append(deployment.Spec.Template.Spec.Tolerations, corev1.Toleration{
+			deployment.Spec.Template.Spec.Tolerations = append(deployment.Spec.Template.Spec.Tolerations, corev1.Toleration{
 				Key:      "kubernetes.azure.com/scalesetpriority",
 				Value:    "spot",
 				Operator: corev1.TolerationOpEqual,
 				Effect:   corev1.TaintEffectNoSchedule,
 			})
-			return &kwhmutating.MutatorResult{MutatedObject: pod}, nil
+			return &kwhmutating.MutatorResult{MutatedObject: deployment}, nil
 		}
 	} else {
 		m.logger.Debugf("Deployment %s dont have all required annotation for correct work", deployment.Name)

@@ -13,7 +13,7 @@ webhooks:
         path: /webhooks/mutating/certorder
       caBundle: CA_BUNDLE
     rules:
-      - operations: ["UPDATE"]
+      - operations: ["CREATE", "UPDATE"]
         apiGroups: ["acme.cert-manager.io"]
         apiVersions: ["v1"]
-        resources: ["chalange"]
+        resources: ["challenges", "challenges/status"]
