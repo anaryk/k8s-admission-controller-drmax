@@ -53,7 +53,9 @@ func (m *SpotScalerMutator) Mutate(_ context.Context, _ *kwhmodel.AdmissionRevie
 	var numberOfbesteffordAnnotation string = "spot-scaler.drmax.global/bestefford"
 	var enabledAnnotation string = "spot-scaler.drmax.global/enabled"
 
-	m.logger.Debugf("Debug info: number of guaranteed: %s, number of bestefford: %s", deployment.Annotations[numberOfguaranteedAnnotation], deployment.Annotations[numberOfbesteffordAnnotation])
+	depsAnnotations := deployment.GetAnnotations()
+
+	m.logger.Debugf("Debug info: number of guaranteed: %s, number of bestefford: %s", depsAnnotations[numberOfguaranteedAnnotation], depsAnnotations[numberOfbesteffordAnnotation])
 
 	//Validate deployment annotation and check if soutable fot mutation
 	if deployment.Annotations[enabledAnnotation] == "true" && deployment.Annotations[numberOfguaranteedAnnotation] != "" && deployment.Annotations[numberOfbesteffordAnnotation] != "" {
