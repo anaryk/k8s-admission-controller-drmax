@@ -23,6 +23,10 @@ func (m *certOrderMutator) Mutate(_ context.Context, _ *kwhmodel.AdmissionReview
 	if chalange.Status.State == acmecertmanager.Errored {
 		m.logger.Infof("Challenge %s jump to errored state. Mutating to pending state!", chalange.Name)
 		chalange.Status.State = acmecertmanager.Expired
+		if chalange.Annotations == nil {
+			chalange.Annotations = make(map[string]string)
+		}
+		chalange.Annotations["webhook.drmax.global/mutate"] = "true"
 		return &kwhmutating.MutatorResult{MutatedObject: chalange}, nil
 	} else if chalange.Status.State != "" {
 		m.logger.Debugf("Challenge %s is in state %s", chalange.Name, chalange.Status.State)
