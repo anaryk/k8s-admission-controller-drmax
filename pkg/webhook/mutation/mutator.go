@@ -55,6 +55,7 @@ func (m *SpotScalerMutator) Mutate(_ context.Context, _ *kwhmodel.AdmissionRevie
 
 	//Validate deployment annotation and check if soutable fot mutation
 	if deployment.Annotations[enabledAnnotation] == "true" && deployment.Annotations[numberOfguaranteedAnnotation] != "" && deployment.Annotations[numberOfbesteffordAnnotation] != "" {
+		m.logger.Debugf("Debug info: number of guaranteed: %s, number of bestefford: %s", deployment.Annotations[numberOfguaranteedAnnotation], deployment.Annotations[numberOfbesteffordAnnotation])
 		if utils.ValidateIntFiled(deployment.Annotations[numberOfguaranteedAnnotation]) && utils.ValidateIntFiled(deployment.Annotations[numberOfbesteffordAnnotation]) {
 			m.logger.Debugf("Deployment %s have all required annotation for correct work", deployment.Name)
 		} else {
@@ -74,7 +75,7 @@ func (m *SpotScalerMutator) Mutate(_ context.Context, _ *kwhmodel.AdmissionRevie
 		}
 	} else {
 		m.logger.Debugf("Deployment %s dont have all required annotation for correct work", deployment.Name)
-		return nil, nil
+		return &kwhmutating.MutatorResult{}, nil
 	}
 	return &kwhmutating.MutatorResult{}, nil
 }
