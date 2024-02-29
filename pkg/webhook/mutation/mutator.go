@@ -52,8 +52,6 @@ func (m *SpotScalerMutator) Mutate(_ context.Context, _ *kwhmodel.AdmissionRevie
 
 	podAnnotations := pod.GetAnnotations()
 
-	pod.SetGenerateName("")
-
 	for k, v := range podAnnotations {
 		m.logger.Debugf("Annotation: %s, Value: %s", k, v)
 	}
