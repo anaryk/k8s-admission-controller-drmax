@@ -198,7 +198,7 @@ func main() {
 	c := cron.New()
 
 	// Add CheckAndCacheCertificates job to run every 10 minutes
-	_, err = c.AddFunc("@every 1m", func() {
+	_, err = c.AddFunc("@every 10m", func() {
 		m.logger.Infof("Running CheckAndCacheCertificates() ")
 		err := ccm.CheckAndCacheCertificates()
 		if err != nil {
