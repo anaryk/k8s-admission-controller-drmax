@@ -2,22 +2,29 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	azurewrapper "dev.azure.com/drmaxglobal/devops-team/_git/k8s-system-operator/pkg/azure"
+	"dev.azure.com/drmaxglobal/devops-team/_git/k8s-system-operator/pkg/certificatecache"
+	"dev.azure.com/drmaxglobal/devops-team/_git/k8s-system-operator/pkg/k8s"
 	mutating "dev.azure.com/drmaxglobal/devops-team/_git/k8s-system-operator/pkg/webhook/mutation"
 	validating "dev.azure.com/drmaxglobal/devops-team/_git/k8s-system-operator/pkg/webhook/validation"
+	"github.com/jetstack/cert-manager/pkg/client/clientset/versioned"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/robfig/cron/v3"
 	"github.com/sirupsen/logrus"
 	kwhhttp "github.com/slok/kubewebhook/v2/pkg/http"
 	kwhlog "github.com/slok/kubewebhook/v2/pkg/log"
 	kwhlogrus "github.com/slok/kubewebhook/v2/pkg/log/logrus"
 	kwhprometheus "github.com/slok/kubewebhook/v2/pkg/metrics/prometheus"
 	kwhwebhook "github.com/slok/kubewebhook/v2/pkg/webhook"
+	"k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -27,22 +34,14 @@ const (
 )
 
 type Main struct {
-	flags  *Flags
-	logger kwhlog.Logger
-	stopC  chan struct{}
+	flags        *Flags
+	logger       kwhlog.Logger
+	stopC        chan struct{}
+	keyVaultName string
 }
 
 // Run will run the main program.
 func (m *Main) Run() error {
-
-	logrusLogEntry := logrus.NewEntry(logrus.New())
-	if m.flags.Debug {
-		logrusLogEntry.Logger.SetLevel(logrus.DebugLevel)
-	} else {
-		logrusLogEntry.Logger.SetLevel(logrus.InfoLevel)
-	}
-	m.logger = kwhlogrus.NewLogrus(logrusLogEntry)
-
 	// Create services.
 	promReg := prometheus.NewRegistry()
 	metricsRec, err := kwhprometheus.NewRecorder(kwhprometheus.RecorderConfig{Registry: promReg})
@@ -58,11 +57,34 @@ func (m *Main) Run() error {
 		return err
 	}
 	certOrderMutator = kwhwebhook.NewMeasuredWebhook(metricsRec, certOrderMutator)
-	mpwh, err := kwhhttp.HandlerFor(kwhhttp.HandlerConfig{Webhook: certOrderMutator, Logger: m.logger})
+	certOrderWebHook, err := kwhhttp.HandlerFor(kwhhttp.HandlerConfig{Webhook: certOrderMutator, Logger: m.logger})
 	if err != nil {
 		return err
 	}
-	//Deployment validation webhook (not used)
+
+	//Ingress certs mutating webhook
+	ingressCertsMutator, err := mutating.IngressCertsMutateWebhook(m.logger)
+	if err != nil {
+		return err
+	}
+	ingressCertsMutator = kwhwebhook.NewMeasuredWebhook(metricsRec, ingressCertsMutator)
+	ingressCertsWebHook, err := kwhhttp.HandlerFor(kwhhttp.HandlerConfig{Webhook: ingressCertsMutator, Logger: m.logger})
+	if err != nil {
+		return err
+	}
+
+	//Certificate cache mutating webhook
+	certificateCacheMutator, err := mutating.CertificateCacheMutateWebhook(m.logger, m.keyVaultName)
+	if err != nil {
+		return err
+	}
+	certificateCacheMutator = kwhwebhook.NewMeasuredWebhook(metricsRec, certificateCacheMutator)
+	certificateCacheWebHook, err := kwhhttp.HandlerFor(kwhhttp.HandlerConfig{Webhook: certificateCacheMutator, Logger: m.logger})
+	if err != nil {
+		return err
+	}
+
+	//Deployment validation webhook (not used) only as exampel for feature development
 	vdw, err := validating.NewDeploymentWebhook(minReps, maxReps, m.logger)
 	if err != nil {
 		return err
@@ -82,7 +104,9 @@ func (m *Main) Run() error {
 
 		m.logger.Infof("webhooks listening on %s...", m.flags.ListenAddress)
 		mux := http.NewServeMux()
-		mux.Handle("/webhooks/mutating/certorder", mpwh)
+		mux.Handle("/webhooks/mutating/certorder", certOrderWebHook)
+		mux.Handle("/webhooks/mutating/certificatecache", certificateCacheWebHook)
+		mux.Handle("/webhooks/mutating/ingresscerts", ingressCertsWebHook)
 		mux.Handle("/webhooks/validating/deployment", vdwh)
 		errC <- http.ListenAndServeTLS(
 			m.flags.ListenAddress,
@@ -92,14 +116,12 @@ func (m *Main) Run() error {
 		)
 	}()
 
-	// Serve metrics.
 	metricsHandler := promhttp.HandlerFor(promReg, promhttp.HandlerOpts{})
 	go func() {
 		m.logger.Infof("metrics listening on %s...", m.flags.MetricsListenAddress)
 		errC <- http.ListenAndServe(m.flags.MetricsListenAddress, metricsHandler)
 	}()
 
-	// Run everything
 	defer m.stop()
 
 	sigC := m.createSignalChan()
@@ -135,11 +157,73 @@ func (m *Main) createSignalChan() chan os.Signal {
 
 func main() {
 	m := Main{
-		flags: NewFlags(),
-		stopC: make(chan struct{}),
+		flags:        NewFlags(),
+		stopC:        make(chan struct{}),
+		keyVaultName: os.Getenv("KEY_VAULT_NAME"),
 	}
 
-	err := m.Run()
+	logrusLogEntry := logrus.NewEntry(logrus.New())
+	if m.flags.Debug {
+		logrusLogEntry.Logger.SetLevel(logrus.DebugLevel)
+	} else {
+		logrusLogEntry.Logger.SetLevel(logrus.InfoLevel)
+	}
+	m.logger = kwhlogrus.NewLogrus(logrusLogEntry)
+
+	// Initialize Kubernetes client
+	k8sClient, err := k8s.PrepareLocalKubeconfigK8SClient()
+	if err != nil {
+		m.logger.Errorf("Failed to create Kubernetes client: %v", err)
+	}
+
+	// Initialize Kubernetes clientset
+	k8sClientSet, err := kubernetes.NewForConfig(k8sClient)
+	if err != nil {
+		m.logger.Errorf("Failed to create Kubernetes clientset: %v", err)
+	}
+
+	// Initialize Key Vault client
+	keyVaultClient, err := azurewrapper.NewKeyVaultClient(m.keyVaultName)
+	if err != nil {
+		m.logger.Errorf("Failed to create Key Vault client: %v", err)
+	}
+	certManagerClient, err := versioned.NewForConfig(k8sClient)
+	if err != nil {
+		m.logger.Errorf("Failed to create cert-manager client: %v", err)
+	}
+
+	ccm := certificatecache.NewCertificateCacheManager(k8sClientSet, keyVaultClient, certManagerClient, m.logger)
+
+	// Initialize cron
+	c := cron.New()
+
+	// Add CheckAndCacheCertificates job to run every 10 minutes
+	_, err = c.AddFunc("@every 1m", func() {
+		m.logger.Infof("Running CheckAndCacheCertificates() ")
+		err := ccm.CheckAndCacheCertificates()
+		if err != nil {
+			log.Printf("Failed to check and cache certificates: %v", err)
+		}
+	})
+	if err != nil {
+		log.Fatalf("Failed to add CheckAndCacheCertificates cron job: %v", err)
+	}
+
+	// Add CleanupExpiringCertificates job to run every 4 hours
+	_, err = c.AddFunc("@every 4h", func() {
+		m.logger.Infof("Running CleanupExpiringCertificates() ")
+		err := ccm.CleanupExpiringCertificates()
+		if err != nil {
+			log.Printf("Failed to cleanup expiring certificates: %v", err)
+		}
+	})
+	if err != nil {
+		log.Fatalf("Failed to add CleanupExpiringCertificates cron job: %v", err)
+	}
+
+	c.Start()
+
+	err = m.Run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s", err)
 		os.Exit(1)
