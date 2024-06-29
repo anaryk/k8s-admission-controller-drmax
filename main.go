@@ -171,7 +171,7 @@ func main() {
 	m.logger = kwhlogrus.NewLogrus(logrusLogEntry)
 
 	// Initialize Kubernetes client
-	k8sClient, err := k8s.PrepareLocalKubeconfigK8SClient()
+	k8sClient, err := k8s.PrepareInClusterK8SClient()
 	if err != nil {
 		m.logger.Errorf("Failed to create Kubernetes client: %v", err)
 	}
