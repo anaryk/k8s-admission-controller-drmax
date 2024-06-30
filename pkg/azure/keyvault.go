@@ -89,6 +89,10 @@ func (kvc *KeyVaultClient) DeleteSecret(ctx context.Context, secretName string) 
 	if err != nil {
 		return fmt.Errorf("failed to delete secret: %w", err)
 	}
+	_, err = kvc.client.PurgeDeletedSecret(ctx, secretName, nil)
+	if err != nil {
+		return fmt.Errorf("failed to delete secret: %w", err)
+	}
 	return nil
 }
 
