@@ -12,7 +12,7 @@ import (
 )
 
 func CheckIfCertificateIsReady(certificateName string, namespace string) (bool, error) {
-	restClient, err := k8s.PrepareLocalKubeconfigK8SClient()
+	restClient, err := k8s.PrepareInClusterK8SClient()
 	if err != nil {
 		return false, fmt.Errorf("error creating cert-manager client: %v", err)
 	}
