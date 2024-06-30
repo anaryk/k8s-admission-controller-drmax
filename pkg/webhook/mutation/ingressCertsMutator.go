@@ -20,7 +20,7 @@ func (m *ingressCertsMutator) Mutate(_ context.Context, _ *kwhmodel.AdmissionRev
 	if !ok {
 		return &kwhmutating.MutatorResult{}, nil
 	}
-	if ingressObj.Annotations["admissions.drmax.gl/cache-certs"] == "true" {
+	if ingressObj.Annotations["admissions.drmax.gl/cache-certs"] == "true" && ingressObj.Annotations["admissions.drmax.gl/cert-scheduled-for-save"] != "true" {
 		m.logger.Infof("Ingress %s has cache-certs annotation. checking if certificate is issued!", ingressObj.Name)
 		existReady, err := certmanagerwrapper.CheckIfCertificateIsReady(ingressObj.Spec.TLS[0].SecretName, ingressObj.Namespace)
 		if err != nil {
