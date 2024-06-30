@@ -123,6 +123,15 @@ func (kvc *KeyVaultClient) SaveSecretToK8s(ctx context.Context, secretName, secr
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretNameKube,
 			Namespace: namespace,
+			Labels: map[string]string{
+				"controller.cert-manager.io/fao": "true",
+			},
+			Annotations: map[string]string{
+				"cert-manager.io/certificate-name": secretNameKube,
+				"cert-manager.io/issuer-name":      "cert-manager",
+				"cert-manager.io/issuer-kind":      "Issuer",
+				"cert-manager.io/issuer-group":     "cert-manager.io",
+			},
 		},
 		Data: map[string][]byte{
 			"tls.crt": cert,
