@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"strings"
 	"time"
 
 	"dev.azure.com/drmaxglobal/devops-team/_git/k8s-system-operator/pkg/k8s"
@@ -61,7 +62,16 @@ func (kvc *KeyVaultClient) GetCertificateExpiry(ctx context.Context, secretName 
 		return time.Time{}, fmt.Errorf("failed to get secret: %w", err)
 	}
 
-	block, _ := pem.Decode(cert)
+	expiry, err := getFirstCertExpiryFromPEM(cert)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to parse certificate: %w", err)
+	}
+
+	return expiry, nil
+}
+
+func getFirstCertExpiryFromPEM(certPEM []byte) (time.Time, error) {
+	block, _ := pem.Decode(certPEM)
 	if block == nil || block.Type != "CERTIFICATE" {
 		return time.Time{}, fmt.Errorf("failed to parse certificate PEM")
 	}
@@ -117,17 +127,60 @@ func (kvc *KeyVaultClient) SaveSecretToK8s(ctx context.Context, secretName, secr
 		Type: v1.SecretTypeTLS,
 	}
 
-	_, err = clientset.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
+	existingSecret, err := clientset.CoreV1().Secrets(namespace).Get(ctx, secretNameKube, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to create Kubernetes secret: %w", err)
+		_, err = clientset.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to create Kubernetes secret: %w", err)
+		}
+	} else {
+		existingSecret.Data = secret.Data
+		_, err = clientset.CoreV1().Secrets(namespace).Update(ctx, existingSecret, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to update Kubernetes secret: %w", err)
+		}
 	}
+
 	return nil
 }
 
 func parseCertAndKey(secretValue []byte) ([]byte, []byte) {
 	parts := bytes.Split(secretValue, []byte("\n"))
-	if len(parts) < 2 {
-		return nil, nil
+	var certBuffer bytes.Buffer
+	var keyBuffer bytes.Buffer
+	inCert := false
+	inKey := false
+
+	for _, part := range parts {
+		line := string(part)
+		if strings.HasPrefix(line, "-----BEGIN CERTIFICATE-----") {
+			inCert = true
+		}
+		if strings.HasPrefix(line, "-----BEGIN PRIVATE KEY-----") || strings.HasPrefix(line, "-----BEGIN RSA PRIVATE KEY-----") {
+			inKey = true
+			inCert = false
+		}
+		if inCert {
+			certBuffer.WriteString(line + "\n")
+		} else if inKey {
+			keyBuffer.WriteString(line + "\n")
+		}
+		if strings.HasPrefix(line, "-----END CERTIFICATE-----") {
+			certBuffer.WriteString(line + "\n")
+			inCert = false
+		}
+		if strings.HasPrefix(line, "-----END PRIVATE KEY-----") || strings.HasPrefix(line, "-----END RSA PRIVATE KEY-----") {
+			keyBuffer.WriteString(line + "\n")
+			inKey = false
+		}
 	}
-	return parts[0], parts[1]
+
+	// Remove duplicate ending tags
+	certPEM := certBuffer.String()
+	certPEM = strings.ReplaceAll(certPEM, "\n-----END CERTIFICATE-----\n-----END CERTIFICATE-----", "\n-----END CERTIFICATE-----")
+	keyPEM := keyBuffer.String()
+	keyPEM = strings.ReplaceAll(keyPEM, "\n-----END PRIVATE KEY-----\n-----END PRIVATE KEY-----", "\n-----END PRIVATE KEY-----")
+	keyPEM = strings.ReplaceAll(keyPEM, "\n-----END RSA PRIVATE KEY-----\n-----END RSA PRIVATE KEY-----", "\n-----END RSA PRIVATE KEY-----")
+
+	return []byte(certPEM), []byte(keyPEM)
 }
