@@ -4,11 +4,14 @@ import (
 	"context"
 
 	azurewrapper "dev.azure.com/drmaxglobal/devops-team/_git/k8s-system-operator/pkg/azure"
+	"dev.azure.com/drmaxglobal/devops-team/_git/k8s-system-operator/pkg/k8s"
 	certmanager "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
 	kwhlog "github.com/slok/kubewebhook/v2/pkg/log"
 	kwhmodel "github.com/slok/kubewebhook/v2/pkg/model"
 	kwhmutating "github.com/slok/kubewebhook/v2/pkg/webhook/mutating"
+	v1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 type certificateCaheMutator struct {
@@ -22,6 +25,38 @@ func (m *certificateCaheMutator) Mutate(_ context.Context, _ *kwhmodel.Admission
 	if !ok {
 		return &kwhmutating.MutatorResult{}, nil
 	}
+	k8sRestClient, err := k8s.PrepareInClusterK8SClient()
+	if err != nil {
+		m.logger.Errorf("Error creating k8s rest client: %v", err)
+		return &kwhmutating.MutatorResult{}, nil
+	}
+	k8sClient, err := kubernetes.NewForConfig(k8sRestClient)
+	if err != nil {
+		m.logger.Errorf("Error creating k8s client: %v", err)
+		return &kwhmutating.MutatorResult{}, nil
+	}
+	// Check if the certificate has ownerReferences pointing to an Ingress
+	var ingress *v1.Ingress
+	for _, ownerRef := range cert.GetOwnerReferences() {
+		if ownerRef.Kind == "Ingress" {
+			ingress, err = k8sClient.NetworkingV1().Ingresses(cert.Namespace).Get(context.TODO(), ownerRef.Name, metav1.GetOptions{})
+			if err != nil {
+				m.logger.Errorf("Error getting Ingress object: %v", err)
+				return &kwhmutating.MutatorResult{}, err
+			}
+			break
+		}
+	}
+	if ingress == nil {
+		m.logger.Infof("Certificate %s does not have an Ingress owner reference, skipping mutation", cert.Name)
+		return &kwhmutating.MutatorResult{}, nil
+	}
+
+	if ingress.Annotations["admissions.drmax.gl/cache-certs"] != "true" {
+		m.logger.Infof("Ingress %s does not have the required annotation, skipping mutation", ingress.Name)
+		return &kwhmutating.MutatorResult{}, nil
+	}
+
 	exist, err := azureKv.SecretExists(context.TODO(), cert.Name+"--"+cert.Namespace)
 	if err != nil {
 		m.logger.Errorf("Error checking if certificate is ready: %v", err)

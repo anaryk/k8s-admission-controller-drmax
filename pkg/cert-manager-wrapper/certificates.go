@@ -28,9 +28,10 @@ func CheckIfCertificateIsReady(certificateName string, namespace string) (bool, 
 	}
 
 	for _, condition := range cert.Status.Conditions {
-		if condition.Type == certmanagerv1.CertificateConditionReady {
+		if condition.Type == certmanagerv1.CertificateConditionReady && condition.Status == "True" {
 			return true, nil
 		}
 	}
+
 	return false, fmt.Errorf("certificate %s is not ready", certificateName)
 }
