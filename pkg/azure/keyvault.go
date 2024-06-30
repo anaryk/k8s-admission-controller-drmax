@@ -70,6 +70,20 @@ func (kvc *KeyVaultClient) GetCertificateExpiry(ctx context.Context, secretName 
 	return expiry, nil
 }
 
+func (kvc *KeyVaultClient) GetCertificateDetails(ctx context.Context, secretName string) (string, []string, error) {
+	cert, _, err := kvc.GetSecret(ctx, secretName)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to get secret: %w", err)
+	}
+
+	commonName, altNames, err := getFirstCertDetailsFromPEM(cert)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to parse certificate: %w", err)
+	}
+
+	return commonName, altNames, nil
+}
+
 func getFirstCertExpiryFromPEM(certPEM []byte) (time.Time, error) {
 	block, _ := pem.Decode(certPEM)
 	if block == nil || block.Type != "CERTIFICATE" {
@@ -82,6 +96,20 @@ func getFirstCertExpiryFromPEM(certPEM []byte) (time.Time, error) {
 	}
 
 	return parsedCert.NotAfter, nil
+}
+
+func getFirstCertDetailsFromPEM(certPEM []byte) (string, []string, error) {
+	block, _ := pem.Decode(certPEM)
+	if block == nil || block.Type != "CERTIFICATE" {
+		return "", nil, fmt.Errorf("failed to parse certificate PEM")
+	}
+
+	parsedCert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to parse certificate: %w", err)
+	}
+
+	return parsedCert.Subject.CommonName, parsedCert.DNSNames, nil
 }
 
 func (kvc *KeyVaultClient) DeleteSecret(ctx context.Context, secretName string) error {
@@ -109,6 +137,12 @@ func (kvc *KeyVaultClient) SaveSecretToK8s(ctx context.Context, secretName, secr
 	if err != nil {
 		return fmt.Errorf("failed to get secret from key vault: %w", err)
 	}
+
+	commonName, altNames, err := getFirstCertDetailsFromPEM(cert)
+	if err != nil {
+		return fmt.Errorf("failed to parse certificate: %w", err)
+	}
+
 	client, err := k8s.PrepareInClusterK8SClient()
 	if err != nil {
 		return fmt.Errorf("failed to create Kubernetes client: %w", err)
@@ -127,9 +161,13 @@ func (kvc *KeyVaultClient) SaveSecretToK8s(ctx context.Context, secretName, secr
 				"controller.cert-manager.io/fao": "true",
 			},
 			Annotations: map[string]string{
+				"cert-manager.io/alt-names":        strings.Join(altNames, ","),
+				"cert-manager.io/common-name":      commonName,
 				"cert-manager.io/certificate-name": secretNameKube,
+				"cert-manager.io/ip-sans":          "",
+				"cert-manager.io/uri-sans":         "",
 				"cert-manager.io/issuer-name":      "cert-manager",
-				"cert-manager.io/issuer-kind":      "Issuer",
+				"cert-manager.io/issuer-kind":      "ClusterIssuer",
 				"cert-manager.io/issuer-group":     "cert-manager.io",
 			},
 		},
@@ -148,6 +186,8 @@ func (kvc *KeyVaultClient) SaveSecretToK8s(ctx context.Context, secretName, secr
 		}
 	} else {
 		existingSecret.Data = secret.Data
+		existingSecret.Labels = secret.Labels
+		existingSecret.Annotations = secret.Annotations
 		_, err = clientset.CoreV1().Secrets(namespace).Update(ctx, existingSecret, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to update Kubernetes secret: %w", err)
