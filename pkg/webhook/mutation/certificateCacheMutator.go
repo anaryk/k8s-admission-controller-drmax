@@ -50,6 +50,7 @@ func (m *certificateCaheMutator) Mutate(_ context.Context, _ *kwhmodel.Admission
 		cert.Annotations["admissions.drmax.gl/cert-cache-name"] = cert.Name + "--" + cert.Namespace
 		cert.Annotations["admissions.drmax.gl/cert-cache-namespace"] = cert.Namespace
 		cert.Annotations["admissions.drmax.gl/time-of-sync"] = metav1.Now().String()
+		m.logger.Infof(" -- MUTATED -- Certificate %s is cached into Azure KeyVault!", cert.Name)
 		return &kwhmutating.MutatorResult{MutatedObject: cert}, nil
 	}
 	return &kwhmutating.MutatorResult{}, nil

@@ -29,6 +29,7 @@ func (m *ingressCertsMutator) Mutate(_ context.Context, _ *kwhmodel.AdmissionRev
 		if existReady && ingressObj.Annotations["admissions.drmax.gl/cert-cached"] != "true" {
 			m.logger.Infof("Certificate for ingress %s is ready. Marking this ingress and certificate for save to cache", ingressObj.Name)
 			ingressObj.Annotations["admissions.drmax.gl/cert-scheduled-for-save"] = "true"
+			m.logger.Infof(" -- MUTATED -- Ingress %s is marked for saving certificate to cache in next periodical iteration!", ingressObj.Name)
 			return &kwhmutating.MutatorResult{MutatedObject: ingressObj}, nil
 		} else {
 			m.logger.Infof("Certificate for ingress %s is not ready or already loaded from cache!", ingressObj.Name)

@@ -22,9 +22,9 @@ func (m *certOrderMutator) Mutate(_ context.Context, _ *kwhmodel.AdmissionReview
 		return &kwhmutating.MutatorResult{}, nil
 	}
 	if chalange.Status.State == acmecertmanager.Errored && strings.Contains(chalange.Status.Reason, "429") {
-		m.logger.Infof("Challenge %s jump to errored state. Mutating to pending state!", chalange.Name)
 		chalange.Status.State = acmecertmanager.Pending
 		chalange.Status.Reason = "Mutated by DrMax admission webhook, bacause previous order ended up in error state due to ZeroSSL nginx proxy overload (due error)"
+		m.logger.Infof("--- MUTATED --- Challenge %s is mutated back to pending state", chalange.Name)
 		return &kwhmutating.MutatorResult{MutatedObject: chalange}, nil
 	} else if chalange.Status.State != "" {
 		m.logger.Debugf("Challenge %s is in state %s", chalange.Name, chalange.Status.State)

@@ -77,6 +77,8 @@ func (ccm *CertificateCacheManager) CheckAndCacheCertificates() error {
 					ccm.logger.Errorf("failed to update ingress annotations: %v", err)
 				}
 
+				ccm.logger.Infof("certificate for ingress %s is stored in Azure KeyVault and correctly marked using annotations", ingress.Name)
+
 			}
 		}
 	}
@@ -123,6 +125,8 @@ func (ccm *CertificateCacheManager) CleanupExpiringCertificates() error {
 				if err != nil {
 					ccm.logger.Errorf("failed to update certificate annotations: %v", err)
 				}
+
+				ccm.logger.Infof("certificate for ingress %s is expired and deleted from Azure KeyVault", ingress.Name)
 			}
 		}
 	}
