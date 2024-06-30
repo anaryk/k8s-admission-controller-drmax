@@ -74,7 +74,7 @@ func (m *Main) Run() error {
 	}
 
 	//Certificate cache mutating webhook
-	certificateCacheMutator, err := mutating.CertificateCacheMutateWebhook(m.logger, m.keyVaultName)
+	certificateCacheMutator, err := mutating.CertificateCacheMutateWebhook(m.logger, m.flags.KVSafeName)
 	if err != nil {
 		return err
 	}
@@ -157,9 +157,8 @@ func (m *Main) createSignalChan() chan os.Signal {
 
 func main() {
 	m := Main{
-		flags:        NewFlags(),
-		stopC:        make(chan struct{}),
-		keyVaultName: os.Getenv("KEY_VAULT_NAME"),
+		flags: NewFlags(),
+		stopC: make(chan struct{}),
 	}
 
 	logrusLogEntry := logrus.NewEntry(logrus.New())
@@ -183,7 +182,7 @@ func main() {
 	}
 
 	// Initialize Key Vault client
-	keyVaultClient, err := azurewrapper.NewKeyVaultClient(m.keyVaultName)
+	keyVaultClient, err := azurewrapper.NewKeyVaultClient(m.flags.KVSafeName)
 	if err != nil {
 		m.logger.Errorf("Failed to create Key Vault client: %v", err)
 	}

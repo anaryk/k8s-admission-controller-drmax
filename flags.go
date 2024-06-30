@@ -19,6 +19,7 @@ type Flags struct {
 	Debug                bool
 	CertFile             string
 	KeyFile              string
+	KVSafeName           string
 }
 
 // NewFlags returns the flags of the commandline.
@@ -30,6 +31,7 @@ func NewFlags() *Flags {
 	fl.BoolVar(&flags.Debug, "debug", debugDef, "enable debug mode")
 	fl.StringVar(&flags.CertFile, "tls-cert-file", "certs/cert.pem", "TLS certificate file")
 	fl.StringVar(&flags.KeyFile, "tls-key-file", "certs/key.pem", "TLS key file")
+	fl.StringVar(&flags.KVSafeName, "keyvault-safe-name", "my-safe", "Azure Key Vault safe name")
 
 	fl.Parse(os.Args[1:])
 
