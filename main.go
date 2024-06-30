@@ -63,7 +63,7 @@ func (m *Main) Run() error {
 	}
 
 	//Ingress certs mutating webhook
-	ingressCertsMutator, err := mutating.IngressCertsMutateWebhook(m.logger)
+	ingressCertsMutator, err := mutating.IngressCertsMutateWebhook(m.logger, m.flags.KVSafeName)
 	if err != nil {
 		return err
 	}

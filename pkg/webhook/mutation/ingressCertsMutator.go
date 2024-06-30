@@ -3,6 +3,7 @@ package mutating
 import (
 	"context"
 
+	azurewrapper "dev.azure.com/drmaxglobal/devops-team/_git/k8s-system-operator/pkg/azure"
 	certmanagerwrapper "dev.azure.com/drmaxglobal/devops-team/_git/k8s-system-operator/pkg/cert-manager-wrapper"
 	kwhlog "github.com/slok/kubewebhook/v2/pkg/log"
 	kwhmodel "github.com/slok/kubewebhook/v2/pkg/model"
@@ -12,15 +13,26 @@ import (
 )
 
 type ingressCertsMutator struct {
-	logger kwhlog.Logger
+	logger       kwhlog.Logger
+	keyVaultName string
 }
 
 func (m *ingressCertsMutator) Mutate(_ context.Context, _ *kwhmodel.AdmissionReview, obj metav1.Object) (*kwhmutating.MutatorResult, error) {
 	ingressObj, ok := obj.(*v1.Ingress)
+	azureKv, _ := azurewrapper.NewKeyVaultClient(m.keyVaultName)
 	if !ok {
 		return &kwhmutating.MutatorResult{}, nil
 	}
-	if ingressObj.Annotations["admissions.drmax.gl/cache-certs"] == "true" && ingressObj.Annotations["admissions.drmax.gl/cert-scheduled-for-save"] != "true" {
+	if ingressObj.Annotations["admissions.drmax.gl/cache-certs"] == "true" && ingressObj.Annotations["admissions.drmax.gl/cert-scheduled-for-save"] != "true" && ingressObj.Annotations["admissions.drmax.gl/cert-cached"] != "true" {
+		existCacheKey, err := azureKv.SecretExists(context.TODO(), ingressObj.Spec.TLS[0].SecretName+"--"+ingressObj.Namespace)
+		if err != nil {
+			m.logger.Errorf("Error checking if certificate is ready: %v", err)
+		}
+		if existCacheKey {
+			m.logger.Infof("Ingress %s has cache-certs annotation. Certificate is already cached!", ingressObj.Name)
+			ingressObj.Annotations["admissions.drmax.gl/cert-cached"] = "true"
+			return &kwhmutating.MutatorResult{MutatedObject: ingressObj}, nil
+		}
 		m.logger.Infof("Ingress %s has cache-certs annotation. checking if certificate is issued!", ingressObj.Name)
 		existReady, err := certmanagerwrapper.CheckIfCertificateIsReady(ingressObj.Spec.TLS[0].SecretName, ingressObj.Namespace)
 		if err != nil {

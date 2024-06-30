@@ -7,9 +7,9 @@ import (
 	v1 "k8s.io/api/networking/v1"
 )
 
-func IngressCertsMutateWebhook(logger kwhlog.Logger) (kwhwebhook.Webhook, error) {
+func IngressCertsMutateWebhook(logger kwhlog.Logger, keyVaultName string) (kwhwebhook.Webhook, error) {
 	mutators := []kwhmutating.Mutator{
-		&ingressCertsMutator{logger: logger},
+		&ingressCertsMutator{logger: logger, keyVaultName: keyVaultName},
 	}
 
 	return kwhmutating.NewWebhook(kwhmutating.WebhookConfig{
