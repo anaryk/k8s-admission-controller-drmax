@@ -129,15 +129,7 @@ func (ccm *CertificateCacheManager) CleanupExpiringCertificates() error {
 					ccm.logger.Errorf("failed to update certificate annotations: %v", err)
 				}
 
-				// Delete the Kubernetes Secret results insto cert manager mark Certificate as not ready and validation
-				// skip this certificate to be fully populated.
-
-				err = ccm.k8sClient.CoreV1().Secrets(namespace).Delete(context.Background(), secretName, metav1.DeleteOptions{})
-				if err != nil {
-					ccm.logger.Errorf("failed to delete secret from k8s: %v", err)
-				}
-
-				ccm.logger.Infof("certificate for ingress %s is expired and deleted from Azure KeyVault (Deleting also secret to set certificate tu Ready -> False state)", ingress.Name)
+				ccm.logger.Infof("certificate for ingress %s is expired and deleted from Azure KeyVault", ingress.Name)
 			}
 
 			ccm.logger.Debugf("certificate for ingress %s is not expiring in less then one month (Time of expire %s, Time of cache removal %s)", ingress.Name, expiry.String(), expiry.AddDate(0, 1, 0).String())
