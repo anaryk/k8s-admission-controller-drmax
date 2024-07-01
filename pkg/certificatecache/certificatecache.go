@@ -65,6 +65,19 @@ func (ccm *CertificateCacheManager) CheckAndCacheCertificates() error {
 
 				// Store the cert and key in Azure Key Vault
 				vaultSecretName := fmt.Sprintf("%s--%s", secretName, namespace)
+				kvSercretExist, err := ccm.keyVaultClient.SecretExists(context.Background(), vaultSecretName)
+				if err != nil {
+					ccm.logger.Errorf("failed to check if secret exists in key vault: %v", err)
+					continue
+				}
+				if kvSercretExist {
+					ccm.logger.Infof("certificate for ingress %s is already stored in Azure KeyVault. Now wil be deleted and replaced with new one", ingress.Name)
+					err = ccm.keyVaultClient.DeleteSecret(context.Background(), vaultSecretName)
+					if err != nil {
+						ccm.logger.Errorf("failed to delete secret from key vault: %v", err)
+						continue
+					}
+				}
 				err = ccm.keyVaultClient.StoreSecret(context.Background(), vaultSecretName, cert, key)
 				if err != nil {
 					ccm.logger.Errorf("failed to store secret in key vault: %v", err)
