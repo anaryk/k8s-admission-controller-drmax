@@ -132,7 +132,7 @@ func (ccm *CertificateCacheManager) CleanupExpiringCertificates() error {
 				ccm.logger.Infof("certificate for ingress %s is expired and deleted from Azure KeyVault", ingress.Name)
 			}
 
-			ccm.logger.Debugf("certificate for ingress %s is not expiring in less then one month (Time of expire %s, Time of cache removal %s)", ingress.Name, expiry.String(), expiry.AddDate(0, 1, 0).String())
+			ccm.logger.Debugf("certificate for ingress %s is not expiring in less then one month (Time of expire %s, Time of cache removal %s)", ingress.Name, expiry.String(), expiry.AddDate(0, -1, 0).String())
 		}
 	}
 
