@@ -46,7 +46,9 @@ func (ccm *CertificateCacheManager) CheckAndCacheCertificates() error {
 
 			existReady, err := certmanagerwrapper.CheckIfCertificateIsReady(secretName, namespace)
 			if err != nil {
-				ccm.logger.Errorf("failed to check if certificate is ready: %v", err)
+				//comment this error due to the fact that it is not a critical error
+				//its only spamming while some cert are not ready for longer time
+				//ccm.logger.Errorf("failed to check if certificate is ready: %v", err)
 				continue
 			}
 
