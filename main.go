@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -34,13 +33,13 @@ const (
 )
 
 type Main struct {
-	flags        *Flags
-	logger       kwhlog.Logger
-	stopC        chan struct{}
-	keyVaultName string
+	flags  *Flags
+	logger kwhlog.Logger
+	stopC  chan struct{}
 }
 
 // Run will run the main program.
+// Start mux server to handle webhooks and metrics.
 func (m *Main) Run() error {
 	// Create services.
 	promReg := prometheus.NewRegistry()
@@ -85,12 +84,12 @@ func (m *Main) Run() error {
 	}
 
 	//Deployment validation webhook (not used) only as exampel for feature development
-	vdw, err := validating.NewDeploymentWebhook(minReps, maxReps, m.logger)
+	deploymentReplicasValidator, err := validating.NewDeploymentWebhook(minReps, maxReps, m.logger)
 	if err != nil {
 		return err
 	}
-	vdw = kwhwebhook.NewMeasuredWebhook(metricsRec, vdw)
-	vdwh, err := kwhhttp.HandlerFor(kwhhttp.HandlerConfig{Webhook: vdw, Logger: m.logger})
+	deploymentReplicasValidator = kwhwebhook.NewMeasuredWebhook(metricsRec, deploymentReplicasValidator)
+	deploymentReplicasWebhook, err := kwhhttp.HandlerFor(kwhhttp.HandlerConfig{Webhook: deploymentReplicasValidator, Logger: m.logger})
 	if err != nil {
 		return err
 	}
@@ -107,7 +106,7 @@ func (m *Main) Run() error {
 		mux.Handle("/webhooks/mutating/certorder", certOrderWebHook)
 		mux.Handle("/webhooks/mutating/certificatecache", certificateCacheWebHook)
 		mux.Handle("/webhooks/mutating/ingresscerts", ingressCertsWebHook)
-		mux.Handle("/webhooks/validating/deployment", vdwh)
+		mux.Handle("/webhooks/validating/deployment", deploymentReplicasWebhook)
 		errC <- http.ListenAndServeTLS(
 			m.flags.ListenAddress,
 			m.flags.CertFile,
@@ -186,6 +185,7 @@ func main() {
 	if err != nil {
 		m.logger.Errorf("Failed to create Key Vault client: %v", err)
 	}
+	// Initialize Cert Manager client
 	certManagerClient, err := versioned.NewForConfig(k8sClient)
 	if err != nil {
 		m.logger.Errorf("Failed to create cert-manager client: %v", err)
@@ -201,11 +201,11 @@ func main() {
 		m.logger.Infof("Running CheckAndCacheCertificates() ")
 		err := ccm.CheckAndCacheCertificates()
 		if err != nil {
-			log.Printf("Failed to check and cache certificates: %v", err)
+			m.logger.Warningf("Failed to check and cache certificates: %v", err)
 		}
 	})
 	if err != nil {
-		log.Fatalf("Failed to add CheckAndCacheCertificates cron job: %v", err)
+		m.logger.Errorf("Failed to add CheckAndCacheCertificates cron job: %v", err)
 	}
 
 	// Add CleanupExpiringCertificates job to run every 4 hours
@@ -213,11 +213,11 @@ func main() {
 		m.logger.Infof("Running CleanupExpiringCertificates() ")
 		err := ccm.CleanupExpiringCertificates()
 		if err != nil {
-			log.Printf("Failed to cleanup expiring certificates: %v", err)
+			m.logger.Warningf("Failed to cleanup expiring certificates: %v", err)
 		}
 	})
 	if err != nil {
-		log.Fatalf("Failed to add CleanupExpiringCertificates cron job: %v", err)
+		m.logger.Warningf("Failed to add CleanupExpiringCertificates cron job: %v", err)
 	}
 
 	c.Start()

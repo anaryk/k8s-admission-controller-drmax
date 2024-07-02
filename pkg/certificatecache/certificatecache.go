@@ -44,7 +44,13 @@ func (ccm *CertificateCacheManager) CheckAndCacheCertificates() error {
 			secretName := ingress.Spec.TLS[0].SecretName
 			namespace := ingress.Namespace
 
-			existReady, err := certmanagerwrapper.CheckIfCertificateIsReady(secretName, namespace)
+			certManagerClient, err := certmanagerwrapper.NewCertManagerClient()
+			if err != nil {
+				ccm.logger.Errorf("failed to create cert-manager client: %v", err)
+				continue
+			}
+
+			existReady, err := certManagerClient.CheckIfCertificateIsReady(secretName, namespace)
 			if err != nil {
 				//comment this error due to the fact that it is not a critical error
 				//its only spamming while some cert are not ready for longer time
