@@ -7,6 +7,7 @@ import (
 
 	azurewrapper "dev.azure.com/drmaxglobal/devops-team/_git/k8s-system-operator/pkg/azure"
 	certmanagerwrapper "dev.azure.com/drmaxglobal/devops-team/_git/k8s-system-operator/pkg/cert-manager-wrapper"
+	"dev.azure.com/drmaxglobal/devops-team/_git/k8s-system-operator/pkg/utils"
 	"github.com/jetstack/cert-manager/pkg/client/clientset/versioned"
 	kwhlog "github.com/slok/kubewebhook/v2/pkg/log"
 	v1 "k8s.io/api/networking/v1"
@@ -68,6 +69,18 @@ func (ccm *CertificateCacheManager) CheckAndCacheCertificates() error {
 
 				cert := secret.Data["tls.crt"]
 				key := secret.Data["tls.key"]
+
+				//Check if the cert is in period of renewal (less then 1 month) then skip caching
+				secretCertExpire, err := utils.GetFirstCertExpiryFromPEM(cert)
+				if err != nil {
+					ccm.logger.Errorf("failed to get certificate expiry: %v", err)
+					continue
+				}
+
+				if time.Now().AddDate(0, 1, 0).After(secretCertExpire) {
+					ccm.logger.Debugf("certificate for ingress %s is expiring in less then one month", ingress.Name)
+					continue
+				}
 
 				// Store the cert and key in Azure Key Vault
 				vaultSecretName := fmt.Sprintf("%s--%s", secretName, namespace)

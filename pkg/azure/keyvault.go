@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"dev.azure.com/drmaxglobal/devops-team/_git/k8s-system-operator/pkg/k8s"
+	"dev.azure.com/drmaxglobal/devops-team/_git/k8s-system-operator/pkg/utils"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/keyvault/azsecrets"
 	v1 "k8s.io/api/core/v1"
@@ -62,7 +63,7 @@ func (kvc *KeyVaultClient) GetCertificateExpiry(ctx context.Context, secretName 
 		return time.Time{}, fmt.Errorf("failed to get secret: %w", err)
 	}
 
-	expiry, err := getFirstCertExpiryFromPEM(cert)
+	expiry, err := utils.GetFirstCertExpiryFromPEM(cert)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to parse certificate: %w", err)
 	}
@@ -82,20 +83,6 @@ func (kvc *KeyVaultClient) GetCertificateDetails(ctx context.Context, secretName
 	}
 
 	return commonName, altNames, nil
-}
-
-func getFirstCertExpiryFromPEM(certPEM []byte) (time.Time, error) {
-	block, _ := pem.Decode(certPEM)
-	if block == nil || block.Type != "CERTIFICATE" {
-		return time.Time{}, fmt.Errorf("failed to parse certificate PEM")
-	}
-
-	parsedCert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("failed to parse certificate: %w", err)
-	}
-
-	return parsedCert.NotAfter, nil
 }
 
 func getFirstCertDetailsFromPEM(certPEM []byte) (string, []string, error) {
