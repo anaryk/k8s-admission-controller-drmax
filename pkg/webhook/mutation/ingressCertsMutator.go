@@ -34,7 +34,12 @@ func (m *ingressCertsMutator) Mutate(_ context.Context, _ *kwhmodel.AdmissionRev
 			return &kwhmutating.MutatorResult{MutatedObject: ingressObj}, nil
 		}
 		m.logger.Infof("Ingress %s has cache-certs annotation. checking if certificate is issued!", ingressObj.Name)
-		existReady, err := certmanagerwrapper.CheckIfCertificateIsReady(ingressObj.Spec.TLS[0].SecretName, ingressObj.Namespace)
+		certManagerClient, err := certmanagerwrapper.NewCertManagerClient()
+		if err != nil {
+			m.logger.Errorf("failed to create cert-manager client: %v", err)
+			return &kwhmutating.MutatorResult{}, nil
+		}
+		existReady, err := certManagerClient.CheckIfCertificateIsReady(ingressObj.Spec.TLS[0].SecretName, ingressObj.Namespace)
 		if err != nil {
 			m.logger.Errorf("Error checking if certificate is ready: %v", err)
 		}

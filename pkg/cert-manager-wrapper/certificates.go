@@ -11,18 +11,25 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func CheckIfCertificateIsReady(certificateName string, namespace string) (bool, error) {
+type CertManagerClient struct {
+	client *versioned.Clientset
+}
+
+func NewCertManagerClient() (*CertManagerClient, error) {
 	restClient, err := k8s.PrepareInClusterK8SClient()
 	if err != nil {
-		return false, fmt.Errorf("error creating cert-manager client: %v", err)
+		return nil, fmt.Errorf("error creating cert-manager client: %v", err)
 	}
 
 	certManagerClient, err := versioned.NewForConfig(restClient)
 	if err != nil {
-		return false, fmt.Errorf("error creating cert-manager client: %v", err)
+		return nil, fmt.Errorf("error creating cert-manager client: %v", err)
 	}
+	return &CertManagerClient{client: certManagerClient}, nil
+}
 
-	cert, err := certManagerClient.CertmanagerV1().Certificates(namespace).Get(context.TODO(), certificateName, metav1.GetOptions{})
+func (cmc *CertManagerClient) CheckIfCertificateIsReady(certificateName string, namespace string) (bool, error) {
+	cert, err := cmc.client.CertmanagerV1().Certificates(namespace).Get(context.TODO(), certificateName, metav1.GetOptions{})
 	if err != nil {
 		return false, fmt.Errorf("error getting certificate: %v", err)
 	}
