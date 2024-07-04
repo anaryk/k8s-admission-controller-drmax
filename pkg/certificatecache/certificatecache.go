@@ -158,6 +158,44 @@ func (ccm *CertificateCacheManager) CleanupExpiringCertificates() error {
 	return nil
 }
 
+func (ccm *CertificateCacheManager) CheckAndMark() error {
+	ingressList, err := ccm.k8sClient.NetworkingV1().Ingresses("").List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to list ingress objects: %w", err)
+	}
+
+	for _, ingress := range ingressList.Items {
+		if ingress.Annotations["admissions.drmax.gl/cache-certs"] == "true" &&
+			ingress.Annotations["admissions.drmax.gl/cert-scheduled-for-save"] != "true" &&
+			ingress.Annotations["admissions.drmax.gl/cert-cached"] != "true" {
+
+			ccm.logger.Infof("Ingress %s has cache-certs annotation. checking if certificate is issued!", ingress.Name)
+			certManagerClient, err := certmanagerwrapper.NewCertManagerClient()
+			if err != nil {
+				ccm.logger.Errorf("failed to create cert-manager client: %v", err)
+				continue
+			}
+			existReady, err := certManagerClient.CheckIfCertificateIsReady(ingress.Spec.TLS[0].SecretName, ingress.Namespace)
+			if err != nil {
+				ccm.logger.Errorf("Error checking if certificate is ready: %v", err)
+			}
+			if existReady && ingress.Annotations["admissions.drmax.gl/cert-cached"] != "true" {
+				ccm.logger.Infof("Certificate for ingress %s is ready. Marking this ingress and certificate for save to cache", ingress.Name)
+				err = ccm.updateIngressAnnotations(&ingress, map[string]string{
+					"admissions.drmax.gl/cert-scheduled-for-save": "true",
+				})
+				if err != nil {
+					ccm.logger.Errorf("failed to update ingress annotations: %v", err)
+				}
+				ccm.logger.Infof(" -- MUTATED -- Ingress %s is marked for saving certificate to cache in next periodical iteration!", ingress.Name)
+			} else {
+				ccm.logger.Debugf("Certificate for ingress %s is not ready or already loaded from cache!", ingress.Name)
+			}
+		}
+	}
+	return nil
+}
+
 func (ccm *CertificateCacheManager) updateIngressAnnotations(ingress *v1.Ingress, annotations map[string]string) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		for key, value := range annotations {
