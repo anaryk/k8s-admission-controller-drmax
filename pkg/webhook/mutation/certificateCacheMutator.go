@@ -4,8 +4,10 @@ import (
 	"context"
 
 	azurewrapper "dev.azure.com/drmaxglobal/devops-team/_git/k8s-system-operator/pkg/azure"
+	certmanagerwrapper "dev.azure.com/drmaxglobal/devops-team/_git/k8s-system-operator/pkg/cert-manager-wrapper"
 	"dev.azure.com/drmaxglobal/devops-team/_git/k8s-system-operator/pkg/k8s"
 	certmanager "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
+	cmmeta "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
 	kwhlog "github.com/slok/kubewebhook/v2/pkg/log"
 	kwhmodel "github.com/slok/kubewebhook/v2/pkg/model"
 	kwhmutating "github.com/slok/kubewebhook/v2/pkg/webhook/mutating"
@@ -35,6 +37,12 @@ func (m *certificateCaheMutator) Mutate(_ context.Context, _ *kwhmodel.Admission
 		m.logger.Errorf("Error creating k8s client: %v", err)
 		return &kwhmutating.MutatorResult{}, nil
 	}
+	certManagerClient, err := certmanagerwrapper.NewCertManagerClient()
+	if err != nil {
+		m.logger.Errorf("Error creating cert-manager client: %v", err)
+		return &kwhmutating.MutatorResult{}, nil
+	}
+
 	// Check if the certificate has ownerReferences pointing to an Ingress
 	var ingress *v1.Ingress
 	for _, ownerRef := range cert.GetOwnerReferences() {
@@ -65,7 +73,7 @@ func (m *certificateCaheMutator) Mutate(_ context.Context, _ *kwhmodel.Admission
 		m.logger.Infof("Certificate %s is found in cache and will be used generated as Secret and Certificate object", cert.Name)
 		cert.Status.Conditions = append(cert.Status.Conditions, certmanager.CertificateCondition{
 			Type:    certmanager.CertificateConditionReady,
-			Status:  "True",
+			Status:  cmmeta.ConditionTrue,
 			Reason:  "Cached",
 			Message: "Certificate is cached",
 		})
@@ -86,6 +94,14 @@ func (m *certificateCaheMutator) Mutate(_ context.Context, _ *kwhmodel.Admission
 		cert.Annotations["admissions.drmax.gl/cert-cache-namespace"] = cert.Namespace
 		cert.Annotations["admissions.drmax.gl/time-of-sync"] = metav1.Now().String()
 		m.logger.Infof(" -- MUTATED -- Certificate %s is loaded from KeyVault!", cert.Name)
+
+		// Create a fake CertificateRequest and mark it as Ready
+		err = certManagerClient.CreateFakeCertificateRequest(cert)
+		if err != nil {
+			m.logger.Errorf("Error creating fake CertificateRequest: %v", err)
+			return &kwhmutating.MutatorResult{}, err
+		}
+
 		return &kwhmutating.MutatorResult{MutatedObject: cert}, nil
 	}
 	return &kwhmutating.MutatorResult{}, nil
