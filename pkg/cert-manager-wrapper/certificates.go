@@ -11,6 +11,7 @@ import (
 	cmmeta "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
 	"github.com/jetstack/cert-manager/pkg/client/clientset/versioned"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 type CertManagerClient struct {
@@ -45,13 +46,18 @@ func (cmc *CertManagerClient) CheckIfCertificateIsReady(certificateName string, 
 	return false, fmt.Errorf("certificate %s is not ready", certificateName)
 }
 
-func (cmc *CertManagerClient) CreateFakeCertificateRequest(cert *certmanagerv1.Certificate) error {
+func (cmc *CertManagerClient) CreateFakeCertificateRequest(cert *certmanagerv1.Certificate, uid string) error {
 	certRequest := &certmanagerv1.CertificateRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cert.Name + "-fake-cr",
 			Namespace: cert.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(cert, certmanagerv1.SchemeGroupVersion.WithKind("Certificate")),
+				{
+					APIVersion: certmanagerv1.SchemeGroupVersion.String(),
+					Kind:       "Certificate",
+					Name:       cert.Name,
+					UID:        types.UID(uid),
+				},
 			},
 		},
 		Spec: certmanagerv1.CertificateRequestSpec{

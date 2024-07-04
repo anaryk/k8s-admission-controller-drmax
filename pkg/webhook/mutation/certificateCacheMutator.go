@@ -96,7 +96,7 @@ func (m *certificateCaheMutator) Mutate(_ context.Context, _ *kwhmodel.Admission
 		m.logger.Infof(" -- MUTATED -- Certificate %s is loaded from KeyVault!", cert.Name)
 
 		// Create a fake CertificateRequest and mark it as Ready
-		err = certManagerClient.CreateFakeCertificateRequest(cert)
+		err = certManagerClient.CreateFakeCertificateRequest(cert, string(cert.UID))
 		if err != nil {
 			m.logger.Errorf("Error creating fake CertificateRequest: %v", err)
 			return &kwhmutating.MutatorResult{}, err
