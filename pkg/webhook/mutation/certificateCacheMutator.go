@@ -4,7 +4,6 @@ import (
 	"context"
 
 	azurewrapper "dev.azure.com/drmaxglobal/devops-team/_git/k8s-system-operator/pkg/azure"
-	certmanagerwrapper "dev.azure.com/drmaxglobal/devops-team/_git/k8s-system-operator/pkg/cert-manager-wrapper"
 	"dev.azure.com/drmaxglobal/devops-team/_git/k8s-system-operator/pkg/k8s"
 	certmanager "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
 	cmmeta "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
@@ -35,11 +34,6 @@ func (m *certificateCaheMutator) Mutate(_ context.Context, _ *kwhmodel.Admission
 	k8sClient, err := kubernetes.NewForConfig(k8sRestClient)
 	if err != nil {
 		m.logger.Errorf("Error creating k8s client: %v", err)
-		return &kwhmutating.MutatorResult{}, nil
-	}
-	certManagerClient, err := certmanagerwrapper.NewCertManagerClient()
-	if err != nil {
-		m.logger.Errorf("Error creating cert-manager client: %v", err)
 		return &kwhmutating.MutatorResult{}, nil
 	}
 
@@ -94,13 +88,6 @@ func (m *certificateCaheMutator) Mutate(_ context.Context, _ *kwhmodel.Admission
 		cert.Annotations["admissions.drmax.gl/cert-cache-namespace"] = cert.Namespace
 		cert.Annotations["admissions.drmax.gl/time-of-sync"] = metav1.Now().String()
 		m.logger.Infof(" -- MUTATED -- Certificate %s is loaded from KeyVault!", cert.Name)
-
-		// Create a fake CertificateRequest and mark it as Ready
-		err = certManagerClient.CreateFakeCertificateRequest(cert, string(cert.UID))
-		if err != nil {
-			m.logger.Errorf("Error creating fake CertificateRequest: %v", err)
-			return &kwhmutating.MutatorResult{}, err
-		}
 
 		return &kwhmutating.MutatorResult{MutatedObject: cert}, nil
 	}

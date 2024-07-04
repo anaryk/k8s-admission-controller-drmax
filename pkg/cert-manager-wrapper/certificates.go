@@ -3,7 +3,6 @@ package certmanagerwrapper
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"dev.azure.com/drmaxglobal/devops-team/_git/k8s-system-operator/pkg/k8s"
 
@@ -11,7 +10,6 @@ import (
 	cmmeta "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
 	"github.com/jetstack/cert-manager/pkg/client/clientset/versioned"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 type CertManagerClient struct {
@@ -44,42 +42,4 @@ func (cmc *CertManagerClient) CheckIfCertificateIsReady(certificateName string, 
 	}
 
 	return false, fmt.Errorf("certificate %s is not ready", certificateName)
-}
-
-func (cmc *CertManagerClient) CreateFakeCertificateRequest(cert *certmanagerv1.Certificate, uid string) error {
-	certRequest := &certmanagerv1.CertificateRequest{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cert.Name + "-fake-cr",
-			Namespace: cert.Namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: certmanagerv1.SchemeGroupVersion.String(),
-					Kind:       "Certificate",
-					Name:       cert.Name,
-					UID:        types.UID(uid),
-				},
-			},
-		},
-		Spec: certmanagerv1.CertificateRequestSpec{
-			Request:   []byte("fake-csr"),
-			IssuerRef: cert.Spec.IssuerRef,
-		},
-		Status: certmanagerv1.CertificateRequestStatus{
-			Conditions: []certmanagerv1.CertificateRequestCondition{
-				{
-					Type:               certmanagerv1.CertificateRequestConditionReady,
-					Status:             cmmeta.ConditionTrue,
-					Reason:             "Fake",
-					Message:            "This is a fake CertificateRequest to satisfy cert-manager",
-					LastTransitionTime: &metav1.Time{Time: time.Now()},
-				},
-			},
-		},
-	}
-
-	_, err := cmc.client.CertmanagerV1().CertificateRequests(cert.Namespace).Create(context.TODO(), certRequest, metav1.CreateOptions{})
-	if err != nil {
-		return fmt.Errorf("error creating fake CertificateRequest: %v", err)
-	}
-	return nil
 }
