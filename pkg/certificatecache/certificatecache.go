@@ -78,7 +78,7 @@ func (ccm *CertificateCacheManager) CheckAndCacheCertificates() error {
 				}
 
 				if time.Now().AddDate(0, 1, 0).After(secretCertExpire) {
-					ccm.logger.Debugf("certificate for ingress %s is expiring in less then one month", ingress.Name)
+					ccm.logger.Debugf("Certificate for ingress %s in namespace %s is expiring in less then one month. Skipping add to cache until new cert are issued", ingress.Name, ingress.Namespace)
 					continue
 				}
 
@@ -98,7 +98,7 @@ func (ccm *CertificateCacheManager) CheckAndCacheCertificates() error {
 					ccm.logger.Errorf("failed to update ingress annotations: %v", err)
 				}
 
-				ccm.logger.Infof("certificate for ingress %s is stored in Azure KeyVault and correctly marked using annotations", ingress.Name)
+				ccm.logger.Infof("certificate for ingress %s in namespace %s is stored in Azure KeyVault and correctly marked using annotations", ingress.Name, ingress.Namespace)
 
 			}
 		}
@@ -148,10 +148,10 @@ func (ccm *CertificateCacheManager) CleanupExpiringCertificates() error {
 					ccm.logger.Errorf("failed to update certificate annotations: %v", err)
 				}
 
-				ccm.logger.Infof("certificate for ingress %s is expired and deleted from Azure KeyVault", ingress.Name)
+				ccm.logger.Infof("certificate for ingress %s in namespace %s is expired and deleted from Azure KeyVault", ingress.Name, ingress.Namespace)
 			}
 
-			ccm.logger.Debugf("certificate for ingress %s is not expiring in less then one month (Time of expire %s, Time of cache removal %s)", ingress.Name, expiry.String(), expiry.AddDate(0, -1, 0).String())
+			ccm.logger.Debugf("certificate for ingress %s in namespace %s is not expiring in less then one month (Time of expire %s, Time of cache removal %s)", ingress.Name, ingress.Namespace, expiry.String(), expiry.AddDate(0, -1, 0).String())
 		}
 	}
 
@@ -187,9 +187,9 @@ func (ccm *CertificateCacheManager) CheckAndMark() error {
 				if err != nil {
 					ccm.logger.Errorf("failed to update ingress annotations: %v", err)
 				}
-				ccm.logger.Infof(" -- MUTATED -- Ingress %s is marked for saving certificate to cache in next periodical iteration!", ingress.Name)
+				ccm.logger.Infof(" -- MUTATED -- Ingress %s in namespace %s is marked for saving certificate to cache in next periodical iteration!", ingress.Name, ingress.Namespace)
 			} else {
-				ccm.logger.Debugf("Certificate for ingress %s is not ready or already loaded from cache!", ingress.Name)
+				ccm.logger.Debugf("Certificate for ingress %s in namespace %s is not ready or already loaded from cache!", ingress.Name, ingress.Namespace)
 			}
 		}
 	}

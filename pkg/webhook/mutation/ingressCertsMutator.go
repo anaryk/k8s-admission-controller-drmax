@@ -29,11 +29,11 @@ func (m *ingressCertsMutator) Mutate(_ context.Context, _ *kwhmodel.AdmissionRev
 			m.logger.Errorf("Error checking if certificate is ready: %v", err)
 		}
 		if existCacheKey {
-			m.logger.Infof("Ingress %s has cache-certs annotation. Certificate is already cached!", ingressObj.Name)
+			m.logger.Infof("Ingress %s in namespace %s has cache-certs annotation. Certificate is already cached!", ingressObj.Name, ingressObj.Namespace)
 			ingressObj.Annotations["admissions.drmax.gl/cert-cached"] = "true"
 			return &kwhmutating.MutatorResult{MutatedObject: ingressObj}, nil
 		}
-		m.logger.Infof("Ingress %s has cache-certs annotation. checking if certificate is issued!", ingressObj.Name)
+		m.logger.Debugf("Ingress %s in namespace %s has cache-certs annotation. checking if certificate is issued!", ingressObj.Name, ingressObj.Namespace)
 		certManagerClient, err := certmanagerwrapper.NewCertManagerClient()
 		if err != nil {
 			m.logger.Errorf("failed to create cert-manager client: %v", err)
@@ -44,12 +44,12 @@ func (m *ingressCertsMutator) Mutate(_ context.Context, _ *kwhmodel.AdmissionRev
 			m.logger.Errorf("Error checking if certificate is ready: %v", err)
 		}
 		if existReady && ingressObj.Annotations["admissions.drmax.gl/cert-cached"] != "true" {
-			m.logger.Infof("Certificate for ingress %s is ready. Marking this ingress and certificate for save to cache", ingressObj.Name)
+			m.logger.Debugf("Certificate for ingress %s in namespace %s is ready. Marking this ingress and certificate for save to cache", ingressObj.Name, ingressObj.Namespace)
 			ingressObj.Annotations["admissions.drmax.gl/cert-scheduled-for-save"] = "true"
-			m.logger.Infof(" -- MUTATED -- Ingress %s is marked for saving certificate to cache in next periodical iteration!", ingressObj.Name)
+			m.logger.Infof(" -- MUTATED -- Ingress %s in namespace %s is marked for saving certificate to cache in next periodical iteration!", ingressObj.Name, ingressObj.Namespace)
 			return &kwhmutating.MutatorResult{MutatedObject: ingressObj}, nil
 		} else {
-			m.logger.Infof("Certificate for ingress %s is not ready or already loaded from cache!", ingressObj.Name)
+			m.logger.Infof("Certificate for ingress %s in namespace %s is not ready or already loaded from cache!", ingressObj.Name, ingressObj.Namespace)
 		}
 	}
 	return &kwhmutating.MutatorResult{}, nil
