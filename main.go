@@ -203,6 +203,11 @@ func main() {
 		if err != nil {
 			m.logger.Warningf("Failed to check and cache certificates: %v", err)
 		}
+		m.logger.Infof("Running CheckAndMark() ")
+		err = ccm.CheckAndMark()
+		if err != nil {
+			m.logger.Warningf("Failed to check and mark certificates: %v", err)
+		}
 	})
 	if err != nil {
 		m.logger.Errorf("Failed to add CheckAndCacheCertificates cron job: %v", err)
@@ -218,18 +223,6 @@ func main() {
 	})
 	if err != nil {
 		m.logger.Warningf("Failed to add CleanupExpiringCertificates cron job: %v", err)
-	}
-
-	// Add CheeckAndMark() job to run every 10 minute
-	_, err = c.AddFunc("@every 10m", func() {
-		m.logger.Infof("Running CheckAndMark() ")
-		err := ccm.CheckAndMark()
-		if err != nil {
-			m.logger.Warningf("Failed to check and mark certificates: %v", err)
-		}
-	})
-	if err != nil {
-		m.logger.Warningf("Failed to add CheckAndMark cron job: %v", err)
 	}
 
 	c.Start()
