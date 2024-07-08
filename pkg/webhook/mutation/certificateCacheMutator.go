@@ -50,12 +50,12 @@ func (m *certificateCaheMutator) Mutate(_ context.Context, _ *kwhmodel.Admission
 		}
 	}
 	if ingress == nil {
-		m.logger.Infof("Certificate %s does not have an Ingress owner reference, skipping mutation", cert.Name)
+		m.logger.Infof("Certificate %s in namespace %s does not have an Ingress owner reference, skipping mutation", cert.Name, cert.Namespace)
 		return &kwhmutating.MutatorResult{}, nil
 	}
 
 	if ingress.Annotations["admissions.drmax.gl/cache-certs"] != "true" {
-		m.logger.Infof("Ingress %s does not have the required annotation, skipping mutation", ingress.Name)
+		m.logger.Infof("Ingress %s in namespace %s does not have the required annotation, skipping mutation", ingress.Name, ingress.Namespace)
 		return &kwhmutating.MutatorResult{}, nil
 	}
 
@@ -64,7 +64,7 @@ func (m *certificateCaheMutator) Mutate(_ context.Context, _ *kwhmodel.Admission
 		m.logger.Errorf("Error checking if certificate is ready: %v", err)
 	}
 	if exist {
-		m.logger.Infof("Certificate %s is found in cache and will be used generated as Secret and Certificate object", cert.Name)
+		m.logger.Debugf("Certificate %s in namespace %s is found in cache and will be used generated as Secret and Certificate object", cert.Name, cert.Namespace)
 		cert.Status.Conditions = append(cert.Status.Conditions, certmanager.CertificateCondition{
 			Type:    certmanager.CertificateConditionReady,
 			Status:  cmmeta.ConditionTrue,
@@ -87,7 +87,7 @@ func (m *certificateCaheMutator) Mutate(_ context.Context, _ *kwhmodel.Admission
 		cert.Annotations["admissions.drmax.gl/cert-cache-name"] = cert.Name + "--" + cert.Namespace
 		cert.Annotations["admissions.drmax.gl/cert-cache-namespace"] = cert.Namespace
 		cert.Annotations["admissions.drmax.gl/time-of-sync"] = metav1.Now().String()
-		m.logger.Infof(" -- MUTATED -- Certificate %s is loaded from KeyVault!", cert.Name)
+		m.logger.Infof(" -- MUTATED -- Certificate %s in namespace %s is loaded from KeyVault!", cert.Name, cert.Namespace)
 
 		return &kwhmutating.MutatorResult{MutatedObject: cert}, nil
 	}
