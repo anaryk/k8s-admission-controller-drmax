@@ -101,24 +101,41 @@ func getFirstCertDetailsFromPEM(certPEM []byte) (string, []string, error) {
 
 func (kvc *KeyVaultClient) DeleteSecret(ctx context.Context, secretName string) error {
 	//Validate if exist
-	if exists, err := kvc.SecretExists(ctx, secretName); !exists {
+	if exists, _ := kvc.SecretExists(ctx, secretName); !exists {
 		return nil
-	} else if err != nil {
-		return fmt.Errorf("failed to check if secret exists: %w", err)
 	}
-	//End of validating
 
 	//Delete secret
 	_, err := kvc.client.DeleteSecret(ctx, secretName, nil)
 	if err != nil {
 		return fmt.Errorf("failed to delete secret: %w", err)
 	}
+	return nil
+}
 
-	// We need to wait because Azure api is slow as fuck :D
-	time.Sleep(10 * time.Second)
+func (kvc *KeyVaultClient) ListSecretsPendingPurge(ctx context.Context) ([]string, error) {
+	pager := kvc.client.NewListDeletedSecretsPager(nil)
+	var secretsPendingPurge []string
 
-	// Purge secret
-	_, err = kvc.client.PurgeDeletedSecret(ctx, secretName, nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list deleted secrets: %w", err)
+		}
+
+		for _, secret := range page.Value {
+			secretID := string(*secret.ID)
+			secretIDParts := strings.Split(secretID, "/")
+			secretName := secretIDParts[len(secretIDParts)-1]
+			secretsPendingPurge = append(secretsPendingPurge, secretName)
+		}
+	}
+
+	return secretsPendingPurge, nil
+}
+
+func (kvc *KeyVaultClient) PurgerDeletedSecret(ctx context.Context, secretName string) error {
+	_, err := kvc.client.PurgeDeletedSecret(ctx, secretName, nil)
 	if err != nil {
 		return fmt.Errorf("failed to purge secret: %w", err)
 	}
