@@ -196,6 +196,24 @@ func (ccm *CertificateCacheManager) CheckAndMark() error {
 	return nil
 }
 
+func (ccm *CertificateCacheManager) PurgeDeletedSecrets() error {
+	secretsPendingPurge, err := ccm.keyVaultClient.ListSecretsPendingPurge(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to list secrets pending purge: %v", err)
+	}
+
+	for _, secret := range secretsPendingPurge {
+		err = ccm.keyVaultClient.PurgerDeletedSecret(context.Background(), secret)
+		if err != nil {
+			ccm.logger.Errorf("failed to purge secret from key vault: %v", err)
+			continue
+		}
+		ccm.logger.Infof("secret %s is purged from key vault", secret)
+	}
+
+	return nil
+}
+
 func (ccm *CertificateCacheManager) updateIngressAnnotations(ingress *v1.Ingress, annotations map[string]string) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		for key, value := range annotations {

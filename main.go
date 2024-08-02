@@ -215,8 +215,14 @@ func main() {
 
 	// Add CleanupExpiringCertificates job to run every 4 hours
 	_, err = c.AddFunc("@every 4h", func() {
+		m.logger.Infof("Running CertificateCacheManager - PurgeDeletedSecrets() ")
+		err := ccm.PurgeDeletedSecrets()
+		if err != nil {
+			m.logger.Warningf("Failed to purge deleted secrets: %v", err)
+		}
+
 		m.logger.Infof("Running CertificateCacheManager - CleanupExpiringCertificates() ")
-		err := ccm.CleanupExpiringCertificates()
+		err = ccm.CleanupExpiringCertificates()
 		if err != nil {
 			m.logger.Warningf("Failed to cleanup expiring certificates: %v", err)
 		}
