@@ -100,14 +100,24 @@ func getFirstCertDetailsFromPEM(certPEM []byte) (string, []string, error) {
 }
 
 func (kvc *KeyVaultClient) DeleteSecret(ctx context.Context, secretName string) error {
+	//Validate if exist
+	if exists, err := kvc.SecretExists(ctx, secretName); !exists {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("failed to check if secret exists: %w", err)
+	}
+	//End of validating
+
+	//Delete secret
 	_, err := kvc.client.DeleteSecret(ctx, secretName, nil)
 	if err != nil {
 		return fmt.Errorf("failed to delete secret: %w", err)
 	}
 
 	// We need to wait because Azure api is slow as fuck :D
-	time.Sleep(2 * time.Second)
+	time.Sleep(10 * time.Second)
 
+	// Purge secret
 	_, err = kvc.client.PurgeDeletedSecret(ctx, secretName, nil)
 	if err != nil {
 		return fmt.Errorf("failed to purge secret: %w", err)
