@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -23,7 +24,10 @@ import (
 	kwhlogrus "github.com/slok/kubewebhook/v2/pkg/log/logrus"
 	kwhprometheus "github.com/slok/kubewebhook/v2/pkg/metrics/prometheus"
 	kwhwebhook "github.com/slok/kubewebhook/v2/pkg/webhook"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/leaderelection"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
 )
 
 const (
@@ -168,6 +172,13 @@ func main() {
 	}
 	m.logger = kwhlogrus.NewLogrus(logrusLogEntry)
 
+	m.logger.Infof("--- DrMax Cluster Controller BootingUp ---")
+
+	if os.Getenv("NAMESPACE") == "" {
+		m.logger.Errorf("Namespace not set. Falling back to default namespace")
+		os.Setenv("NAMESPACE", "default")
+	}
+
 	// Initialize Kubernetes client
 	k8sClient, err := k8s.PrepareInClusterK8SClient()
 	if err != nil {
@@ -195,49 +206,82 @@ func main() {
 
 	// Initialize cron
 	c := cron.New()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	// Add CheckAndCacheCertificates job to run every 10 minutes
-	_, err = c.AddFunc("@every 10m", func() {
-		m.logger.Infof("Running CertificateCacheManager - CheckAndCacheCertificates() ")
-		err := ccm.CheckAndCacheCertificates()
-		if err != nil {
-			m.logger.Warningf("Failed to check and cache certificates: %v", err)
-		}
-		m.logger.Infof("Running CertificateCacheManager - CheckAndMark() ")
-		err = ccm.CheckAndMark()
-		if err != nil {
-			m.logger.Warningf("Failed to check and mark certificates: %v", err)
-		}
-	})
+	id, err := os.Hostname()
 	if err != nil {
-		m.logger.Errorf("Failed to add CheckAndCacheCertificates cron job: %v", err)
-	}
-
-	// Add CleanupExpiringCertificates job to run every 4 hours
-	_, err = c.AddFunc("@every 4h", func() {
-		m.logger.Infof("Running CertificateCacheManager - PurgeDeletedSecrets() ")
-		err := ccm.PurgeDeletedSecrets()
-		if err != nil {
-			m.logger.Warningf("Failed to purge deleted secrets: %v", err)
-		}
-
-		m.logger.Infof("Running CertificateCacheManager - CleanupExpiringCertificates() ")
-		err = ccm.CleanupExpiringCertificates()
-		if err != nil {
-			m.logger.Warningf("Failed to cleanup expiring certificates: %v", err)
-		}
-	})
-	if err != nil {
-		m.logger.Warningf("Failed to add CleanupExpiringCertificates cron job: %v", err)
-	}
-
-	c.Start()
-
-	err = m.Run()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s", err)
+		m.logger.Errorf("Failed to get hostname: %v", err)
 		os.Exit(1)
 	}
-	os.Exit(0)
 
+	lock := &resourcelock.LeaseLock{
+		LeaseMeta: metav1.ObjectMeta{
+			Name:      "drmax-cluster-controller-lock",
+			Namespace: os.Getenv("NAMESPACE"),
+		},
+		Client: k8sClientSet.CoordinationV1(),
+		LockConfig: resourcelock.ResourceLockConfig{
+			Identity: id,
+		},
+	}
+
+	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
+		Lock:          lock,
+		LeaseDuration: 15 * time.Second,
+		RenewDeadline: 10 * time.Second,
+		RetryPeriod:   2 * time.Second,
+		Callbacks: leaderelection.LeaderCallbacks{
+			OnStartedLeading: func(ctx context.Context) {
+				c.Start()
+
+				// Add CheckAndCacheCertificates job to run every 10 minutes
+				_, err := c.AddFunc("@every 10m", func() {
+					m.logger.Infof("Running CertificateCacheManager - CheckAndCacheCertificates() ")
+					err := ccm.CheckAndCacheCertificates()
+					if err != nil {
+						m.logger.Warningf("Failed to check and cache certificates: %v", err)
+					}
+					m.logger.Infof("Running CertificateCacheManager - CheckAndMark() ")
+					err = ccm.CheckAndMark()
+					if err != nil {
+						m.logger.Warningf("Failed to check and mark certificates: %v", err)
+					}
+				})
+				if err != nil {
+					m.logger.Errorf("Failed to add CheckAndCacheCertificates cron job: %v", err)
+				}
+
+				// Add CleanupExpiringCertificates job to run every 4 hours
+				_, err = c.AddFunc("@every 4h", func() {
+					m.logger.Infof("Running CertificateCacheManager - PurgeDeletedSecrets() ")
+					err := ccm.PurgeDeletedSecrets()
+					if err != nil {
+						m.logger.Warningf("Failed to purge deleted secrets: %v", err)
+					}
+
+					m.logger.Infof("Running CertificateCacheManager - CleanupExpiringCertificates() ")
+					err = ccm.CleanupExpiringCertificates()
+					if err != nil {
+						m.logger.Warningf("Failed to cleanup expiring certificates: %v", err)
+					}
+				})
+				if err != nil {
+					m.logger.Warningf("Failed to add CleanupExpiringCertificates cron job: %v", err)
+				}
+			},
+			OnStoppedLeading: func() {
+				c.Stop()
+			},
+			OnNewLeader: func(identity string) {
+				m.logger.Infof("new leader elected: %s", identity)
+				err = m.Run()
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "%s", err)
+					os.Exit(1)
+				}
+				os.Exit(0)
+			},
+		},
+	})
 }
