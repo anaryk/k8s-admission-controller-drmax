@@ -98,11 +98,11 @@ func (m *Main) Run() error {
 		return err
 	}
 
-	// Create the servers and set them listenig.
+	// Create the servers and set them listening.
 	errC := make(chan error)
 
 	// Serve webhooks.
-	// TODO: Move to it's own service.
+	// TODO: Move to its own service.
 	go func() {
 
 		m.logger.Infof("webhooks listening on %s...", m.flags.ListenAddress)
@@ -134,7 +134,7 @@ func (m *Main) Run() error {
 			m.logger.Errorf("error received: %s", err)
 			return err
 		}
-		m.logger.Infof("app finished successfuly")
+		m.logger.Infof("app finished successfully")
 	case s := <-sigC:
 		m.logger.Infof("signal %s received", s)
 		return nil
@@ -233,6 +233,7 @@ func main() {
 		RetryPeriod:   2 * time.Second,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
+				// Only leader should start the cron jobs and run the main logic
 				c.Start()
 
 				// Add CheckAndCacheCertificates job to run every 10 minutes
@@ -269,18 +270,21 @@ func main() {
 				if err != nil {
 					m.logger.Warningf("Failed to add CleanupExpiringCertificates cron job: %v", err)
 				}
-			},
-			OnStoppedLeading: func() {
-				c.Stop()
-			},
-			OnNewLeader: func(identity string) {
-				m.logger.Infof("new leader elected: %s", identity)
+
 				err = m.Run()
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "%s", err)
 					os.Exit(1)
 				}
 				os.Exit(0)
+			},
+			OnStoppedLeading: func() {
+				c.Stop()
+				m.logger.Infof("Lost leadership, stopping application")
+				os.Exit(0)
+			},
+			OnNewLeader: func(identity string) {
+				m.logger.Infof("new leader elected: %s", identity)
 			},
 		},
 	})
