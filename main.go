@@ -284,7 +284,7 @@ func main() {
 				os.Exit(0)
 			},
 			OnNewLeader: func(identity string) {
-				m.logger.Infof("new leader elected: %s", identity)
+				m.logger.Infof("current elected leader: %s", identity)
 			},
 		},
 	})
