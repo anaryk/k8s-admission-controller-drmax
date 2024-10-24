@@ -1,0 +1,13 @@
+#Thiis workload identity is used to authenticate the pod to Azure Key Vault !
+workloadIdentity:
+  clientId: "<Workload client ID>"
+  tenantId: "<Workload tenant ID>"
+
+deployment:
+  #It can only run in one replica .. other replicas will wait for leader election due to cron implementation
+  replicas: 1
+  image:
+    repository: ghcr.io/anaryk/k8s-admission-controller-drmax
+    tag: master
+    pullPolicy: Always
+  
