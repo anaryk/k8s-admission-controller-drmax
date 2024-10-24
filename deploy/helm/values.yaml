@@ -2,6 +2,7 @@
 workloadIdentity:
   clientId: "36f60651-6924-4090-a031-e9a0b245bc0e"
   tenantId: "668ad69f-8a15-4fa2-b679-3b3fe3eb6fb6"
+  serviceAccountName: "certcache--keyvault--identity"
 
 deployment:
   #It can only run in one replica .. other replicas will wait for leader election due to cron implementation

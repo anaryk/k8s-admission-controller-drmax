@@ -2,6 +2,7 @@
 workloadIdentity:
   clientId: "<Workload client ID>"
   tenantId: "<Workload tenant ID>"
+  serviceAccountName: "<Workload service account name>"
 
 deployment:
   #It can only run in one replica .. other replicas will wait for leader election due to cron implementation
