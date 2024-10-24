@@ -1,5 +1,3 @@
-*.yaml
+
 certs/
-deploy/
 !deploy/webhooks.yaml.tpl
-!deploy/helm/*
