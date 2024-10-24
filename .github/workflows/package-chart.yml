@@ -1,0 +1,36 @@
+name: Create and publish Helm chart
+
+on:
+  push:
+    branches: ['master']
+    tags:
+      - '**'
+
+env:
+  REGISTRY: ghcr.io
+  CHART_NAME: ${{ github.repository }}/helm
+  CHART_PATH: ./deploy/helm
+
+jobs:
+  build-and-push-chart:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install Helm
+        run: |
+          curl -L https://get.helm.sh/helm-v3.10.0-linux-amd64.tar.gz | tar zx
+          sudo mv linux-amd64/helm /usr/local/bin/helm
+      - name: Log in to the OCI registry
+        run: |
+          echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} --password-stdin ${{ env.REGISTRY }}
+      - name: Package Helm chart
+        run: |
+          helm package ${{ env.CHART_PATH }} --destination ./chart-output
+      - name: Push Helm chart to OCI
+        run: |
+          CHART_FILE=$(ls ./chart-output/*.tgz)
+          helm push $CHART_FILE oci://${{ env.REGISTRY }}/${{ env.CHART_NAME }}

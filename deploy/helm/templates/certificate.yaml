@@ -1,0 +1,11 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "chart.fullname" . }}-certificate
+  namespace: '{{ .Release.Namespace }}'
+spec:
+  secretName: {{ include "chart.fullname" . }}-certs
+  dnsNames:
+  - {{ include "chart.fullname" . }}-svc
+  issuerRef:
+    name: selfsigned

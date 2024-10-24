@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: certcache--keyvault--identity
+  namespace: '{{ .Release.Namespace }}'
+  annotations:
+    azure.workload.identity/client-id: {{ .Values.workloadIdentity.clientId | quote}}
+    azure.workload.identity/tenant-id: {{ .Values.workloadIdentity.tenantId | quote}}

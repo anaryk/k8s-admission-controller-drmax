@@ -1,0 +1,46 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: k8s-admission-webhook-drmax
+  annotations:
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "chart.fullname" . }}-certificate
+webhooks:
+  - name: certorder.drmax.global
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    clientConfig:
+      service:
+        name: {{ include "chart.fullname" . }}-svc
+        namespace: '{{ .Release.Namespace }}'
+        path: /webhooks/mutating/certorder
+    rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: ["acme.cert-manager.io"]
+        apiVersions: ["v1"]
+        resources: ["challenges", "challenges/status"]
+  - name: ingresscerts.drmax.global
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    clientConfig:
+      service:
+        name: {{ include "chart.fullname" . }}-svc
+        namespace: '{{ .Release.Namespace }}'
+        path: /webhooks/mutating/ingresscerts
+    rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: ["networking.k8s.io"]
+        apiVersions: ["v1"]
+        resources: ["ingresses"]
+  - name: certificatecache.drmax.global
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    clientConfig:
+      service:
+        name: {{ include "chart.fullname" . }}-svc
+        namespace: '{{ .Release.Namespace }}'
+        path: /webhooks/mutating/certificatecache
+    rules:
+      - operations: ["CREATE"]
+        apiGroups: ["cert-manager.io"]
+        apiVersions: ["v1"]
+        resources: ["certificates"]
