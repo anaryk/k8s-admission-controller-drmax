@@ -6,6 +6,6 @@ metadata:
 spec:
   secretName: {{ include "chart.fullname" . }}-certs
   dnsNames:
-  - {{ include "chart.fullname" . }}-svc
+  - {{ include "chart.fullname" . }}-svc.{{ .Release.Namespace }}.svc
   issuerRef:
     name: selfsigned

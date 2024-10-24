@@ -9,6 +9,6 @@ deployment:
   replicas: 1
   image:
     repository: ghcr.io/anaryk/k8s-admission-controller-drmax
-    tag: master
+    tag: 0.2.2
     pullPolicy: Always
   
