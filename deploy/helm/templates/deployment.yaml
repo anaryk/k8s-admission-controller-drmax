@@ -15,6 +15,7 @@ spec:
       labels:
         app: {{ include "chart.fullname" . }}
     spec:
+      serviceAccountName: {{ .Values.workloadIdentity.serviceAccountName }}
       containers:
         - name: k8s-admission-webhook-drmax
           image: {{ .Values.deployment.image.repository }}:{{ .Values.deployment.image.tag }}
