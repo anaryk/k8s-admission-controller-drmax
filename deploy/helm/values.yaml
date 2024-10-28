@@ -5,10 +5,14 @@ workloadIdentity:
   serviceAccountName: "certcache--keyvault--identity"
 
 deployment:
+  debug: "false"
   #It can only run in one replica .. other replicas will wait for leader election due to cron implementation
   replicas: 1
   image:
     repository: ghcr.io/anaryk/k8s-admission-controller-drmax
     tag: 0.2.2
     pullPolicy: Always
+
+keyvault:
+  safeName: "glkvnecertcache001d"
   
