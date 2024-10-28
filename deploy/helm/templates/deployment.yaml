@@ -23,6 +23,8 @@ spec:
           args:
             - --tls-cert-file=/etc/webhook/certs/tls.crt
             - --tls-key-file=/etc/webhook/certs/tls.key
+            - --keyvault-safe-name={{ .Values.keyvault.safeName }}
+            - --debug={{ .Values.deployment.debug }}
           env:
             - name: NAMESPACE
               valueFrom:
